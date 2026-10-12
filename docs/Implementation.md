@@ -1,5 +1,14 @@
 # Implementation
 
+## 1.4 — Inline thread renaming
+
+Status: complete.
+
+- Each row on the ☰ home screen gained a ✎ button next to ✕: the title becomes an
+  inline auto-focused input. **Enter** or blur saves, **Escape** cancels.
+- `useThreads.renameThread` ignores empty titles (keeps the previous one) and does not
+  bump `updatedAt`, so renaming never reshuffles or restamps the list.
+
 ## 1.3 — Thread list popover & lazy thread creation
 
 Status: complete.

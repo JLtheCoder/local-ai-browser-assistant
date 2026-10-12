@@ -51,6 +51,14 @@ export function useThreads() {
     [threads, activeId],
   );
 
+  const renameThread = useCallback((id: string, title: string) => {
+    const next = title.trim();
+    // An empty rename keeps the previous title. updatedAt is untouched so the
+    // list order/timestamp doesn't change just because the title was edited.
+    if (!next) return;
+    setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, title: next } : t)));
+  }, []);
+
   const appendMessage = useCallback((threadId: string, message: ChatMessage) => {
     setThreads((prev) =>
       prev.map((t) => {
@@ -103,6 +111,7 @@ export function useThreads() {
     setActiveId,
     createThread,
     deleteThread,
+    renameThread,
     appendMessage,
     appendChunk,
     setMessage,

@@ -28,6 +28,7 @@ export default function App() {
     setActiveId,
     createThread,
     deleteThread,
+    renameThread,
     appendMessage,
     appendChunk,
     setMessage,
@@ -187,6 +188,7 @@ export default function App() {
           activeId={activeId}
           onSelect={handleSelectThread}
           onDelete={deleteThread}
+          onRename={renameThread}
         />
       ) : (
         <>
