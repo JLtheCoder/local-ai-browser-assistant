@@ -1,4 +1,4 @@
-import type { ConversationTurn, ModeId } from '../ai/types';
+import type { ConversationTurn, ModeId } from '../../ai/types';
 import type { Thread } from './threads';
 
 /** How many recent messages are fed back to the model as context each turn. */

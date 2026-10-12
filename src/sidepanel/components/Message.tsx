@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { ChatMessage } from './threads';
+import type { ChatMessage } from '../lib/threads';
 
 function modeLabel(mode: string): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { newId, truncate } from '../threads';
-import type { ChatMessage, Thread } from '../threads';
+import { newId, truncate } from '../lib/threads';
+import type { ChatMessage, Thread } from '../lib/threads';
 
 const STORAGE_KEY = 'assistant_threads_v1';
 const hasStorage = typeof chrome !== 'undefined' && !!chrome.storage?.local;

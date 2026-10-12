@@ -1,4 +1,4 @@
-import type { ModeId } from '../ai/types';
+import type { ModeId } from '../../ai/types';
 
 export interface ChatMessage {
   id: string;

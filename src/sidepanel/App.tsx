@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDefaultProvider } from '../ai/provider';
 import type { Capabilities, ModeId } from '../ai/types';
-import { buildContext, TEXT_MODES } from './context';
-import { Composer } from './Composer';
-import { Conversation } from './Conversation';
-import { ThreadBar } from './ThreadBar';
+import { CapabilityBanner } from './components/CapabilityBanner';
+import { Composer } from './components/Composer';
+import { Conversation } from './components/Conversation';
+import { ThreadBar } from './components/ThreadBar';
+import { ThreadHome } from './components/ThreadHome';
 import { useThreads } from './hooks/useThreads';
-import { DEFAULT_OPTIONS, type ModeOptions } from './modeOptions';
-import { runMode } from './runMode';
-import { newId } from './threads';
+import { buildContext, TEXT_MODES } from './lib/context';
+import { DEFAULT_OPTIONS, type ModeOptions } from './lib/modeOptions';
+import { runMode } from './lib/runMode';
+import { newId } from './lib/threads';
 
 function isAbortError(err: unknown): boolean {
   if (err instanceof Error && err.name === 'AbortError') return true;
@@ -36,6 +38,7 @@ export default function App() {
   const [modeOptions, setModeOptions] = useState<ModeOptions>(DEFAULT_OPTIONS);
   const [draft, setDraft] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [view, setView] = useState<'chat' | 'home'>('chat');
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -69,109 +72,139 @@ export default function App() {
 
   // Context is derived from the thread as it stands right now: recent turns for
   // the model + the latest assistant result for "that"/empty-input resolution.
-  const ctx = buildContext(activeThread);
+  // Memoized so handleSend (and children) don't get a new object every render.
+  const ctx = useMemo(() => buildContext(activeThread), [activeThread]);
 
-  const handleSend = async (text: string) => {
-    const mode = selectedMode;
-    const content = text.trim();
-    const resolvable = TEXT_MODES.includes(mode) && ctx.lastResult !== null;
-    if ((!content && !resolvable) || isRunning) return;
+  const handleSend = useCallback(
+    async (text: string) => {
+      const mode = selectedMode;
+      const content = text.trim();
+      const resolvable = TEXT_MODES.includes(mode) && ctx.lastResult !== null;
+      if ((!content && !resolvable) || isRunning) return;
 
-    const threadId = activeId ?? createThread();
+      const threadId = activeId ?? createThread();
 
-    appendMessage(threadId, {
-      id: newId(),
-      role: 'user',
-      content,
-      mode,
-      createdAt: Date.now(),
-    });
-    const assistantId = newId();
-    appendMessage(threadId, {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      mode,
-      createdAt: Date.now(),
-    });
-    setDraft('');
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setIsRunning(true);
-    let streamed = '';
-    try {
-      const result = await runMode(provider, mode, content, modeOptions, ctx, {
-        signal: controller.signal,
-        onStream: (chunk) => {
-          streamed += chunk;
-          appendChunk(threadId, assistantId, chunk);
-        },
+      appendMessage(threadId, {
+        id: newId(),
+        role: 'user',
+        content,
+        mode,
+        createdAt: Date.now(),
       });
-      setMessage(threadId, assistantId, { content: result });
-    } catch (err) {
-      if (isAbortError(err)) {
-        if (!streamed) setMessage(threadId, assistantId, { content: '_Stopped._' });
-        return;
+      const assistantId = newId();
+      appendMessage(threadId, {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        mode,
+        createdAt: Date.now(),
+      });
+      setDraft('');
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setIsRunning(true);
+      let streamed = '';
+      try {
+        const result = await runMode(provider, mode, content, modeOptions, ctx, {
+          signal: controller.signal,
+          onStream: (chunk) => {
+            streamed += chunk;
+            appendChunk(threadId, assistantId, chunk);
+          },
+        });
+        setMessage(threadId, assistantId, { content: result });
+      } catch (err) {
+        if (isAbortError(err)) {
+          if (!streamed) setMessage(threadId, assistantId, { content: '_Stopped._' });
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        setMessage(threadId, assistantId, { content: message, error: true });
+      } finally {
+        setIsRunning(false);
+        abortRef.current = null;
       }
-      const message = err instanceof Error ? err.message : String(err);
-      setMessage(threadId, assistantId, { content: message, error: true });
-    } finally {
-      setIsRunning(false);
-      abortRef.current = null;
-    }
-  };
+    },
+    [
+      activeId,
+      appendChunk,
+      appendMessage,
+      ctx,
+      createThread,
+      isRunning,
+      modeOptions,
+      provider,
+      selectedMode,
+      setMessage,
+    ],
+  );
+
+  const handleSendDraft = useCallback(() => {
+    void handleSend(draft);
+  }, [draft, handleSend]);
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  // "＋" opens an unsaved draft: no thread is created (or persisted) until the
+  // first message is sent, which handleSend does via `activeId ?? createThread()`.
+  const handleNewThread = useCallback(() => {
+    setActiveId(null);
+    setDraft('');
+    setView('chat');
+  }, [setActiveId]);
+
+  const handleToggleList = useCallback(() => {
+    setView((current) => (current === 'home' ? 'chat' : 'home'));
+  }, []);
+
+  // Picking a thread (dropdown or home screen) always lands on the chat view.
+  const handleSelectThread = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      setView('chat');
+    },
+    [setActiveId],
+  );
 
   return (
     <div className="flex h-screen flex-col bg-zinc-900 text-zinc-100">
       <ThreadBar
         threads={threads}
         activeId={activeId}
-        onSelect={setActiveId}
-        onNew={createThread}
+        onSelect={handleSelectThread}
+        onNew={handleNewThread}
         onDelete={deleteThread}
+        listView={view === 'home'}
+        onToggleList={handleToggleList}
       />
       <CapabilityBanner capabilities={capabilities} />
-      <Conversation thread={activeThread} />
-      <Composer
-        value={draft}
-        onChange={setDraft}
-        selectedMode={selectedMode}
-        onSelectMode={setSelectedMode}
-        options={modeOptions}
-        onOptionsChange={setModeOptions}
-        onSend={() => void handleSend(draft)}
-        onStop={() => abortRef.current?.abort()}
-        isRunning={isRunning}
-        lastResult={ctx.lastResult}
-      />
+      {view === 'home' ? (
+        <ThreadHome
+          threads={threads}
+          activeId={activeId}
+          onSelect={handleSelectThread}
+          onDelete={deleteThread}
+        />
+      ) : (
+        <>
+          <Conversation thread={activeThread} />
+          <Composer
+            value={draft}
+            onChange={setDraft}
+            selectedMode={selectedMode}
+            onSelectMode={setSelectedMode}
+            options={modeOptions}
+            onOptionsChange={setModeOptions}
+            onSend={handleSendDraft}
+            onStop={handleStop}
+            isRunning={isRunning}
+            lastResult={ctx.lastResult}
+          />
+        </>
+      )}
     </div>
   );
-}
-
-function CapabilityBanner({ capabilities }: { capabilities: Capabilities | null }) {
-  if (!capabilities) return null;
-
-  const downloading = Object.entries(capabilities)
-    .filter(([, status]) => status === 'downloading')
-    .map(([id]) => id);
-  const unavailable = Object.entries(capabilities)
-    .filter(([, status]) => status === 'unavailable')
-    .map(([id]) => id);
-
-  if (downloading.length > 0) {
-    return (
-      <div className="border-b border-amber-900/50 bg-amber-950/40 px-3 py-1.5 text-xs text-amber-300">
-        Downloading models: {downloading.join(', ')}…
-      </div>
-    );
-  }
-  if (unavailable.length > 0) {
-    return (
-      <div className="border-b border-zinc-800 bg-zinc-800/50 px-3 py-1.5 text-xs text-zinc-400">
-        Unavailable here: {unavailable.join(', ')}. Enable the matching chrome://flags.
-      </div>
-    );
-  }
-  return null;
 }

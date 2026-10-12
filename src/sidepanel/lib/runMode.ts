@@ -1,4 +1,4 @@
-import type { AIProvider, ModeId } from '../ai/types';
+import type { AIProvider, ModeId } from '../../ai/types';
 import { historyToSharedContext, resolveText, type SendContext } from './context';
 import type { ModeOptions } from './modeOptions';
 

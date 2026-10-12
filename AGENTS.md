@@ -20,7 +20,10 @@ Chat-style side panel with persistent threads and six modes: Prompt, Translate, 
 
 - `public/manifest.json` — MV3 source of truth, copied to `dist/` on build. `side_panel.default_path: sidepanel.html`, `background.service_worker: background.js`.
 - `sidepanel.html` — Vite HTML entry for the side panel; loads `src/sidepanel/main.tsx`.
-- `src/sidepanel/` — React chat UI: `App.tsx` (thread/composer orchestration + capability banner), `ThreadBar.tsx` (thread dropdown + new/delete), `Conversation.tsx` + `Message.tsx` (markdown chat), `Composer.tsx` (input box, mode pills, per-mode options), `modeOptions.ts` (mode metadata + defaults), `context.ts` (history window, reference resolution, sharedContext builder), `runMode.ts` (mode → provider dispatch), `threads.ts` (thread/message model), `components.tsx`, `hooks/useThreads.ts` (thread state + `chrome.storage.local` persistence).
+- `src/sidepanel/` — React chat UI. `main.tsx` (entry) + `App.tsx` (composition: threads, send flow, abort handling).
+  - `components/` — React components only: `ThreadBar` (☰ home-screen toggle, thread dropdown, new/delete), `ThreadHome` (conversations list screen), `Conversation` + `Message` (markdown chat), `Composer` (input box, mode pills, per-mode options), `CapabilityBanner` (API availability strip), `ui.tsx` (shared primitives: `Label`, `TextArea`, `Select`, `Button`).
+  - `lib/` — non-component logic: `threads.ts` (thread/message model), `context.ts` (history window, reference resolution, sharedContext builder), `modeOptions.ts` (mode metadata, defaults, options-row spec), `runMode.ts` (mode → provider dispatch).
+  - `hooks/useThreads.ts` — thread state + `chrome.storage.local` persistence.
 - `src/ai/` — the provider seam:
   - `types.ts` — `AIProvider` interface + request/capability types. The UI depends only on this.
   - `chrome.ts` — the ONLY file that touches Chrome Built-in AI globals.
@@ -31,9 +34,10 @@ Chat-style side panel with persistent threads and six modes: Prompt, Translate, 
 ## Architecture rules
 
 - **Provider seam:** UI components call the `AIProvider` interface, never the Chrome globals directly. Swap backends (e.g. a local llama.cpp server later) by adding a provider in `src/ai/provider.ts` — no mode/UI changes.
+- **UI code conventions:** event handlers are named, `useCallback`-wrapped functions — never inline closures in JSX or as component props. Derived objects passed to children (e.g. `buildContext`) are `useMemo`-ed so identities stay stable across renders.
 - **Conversation context:** Prompt mode seeds `LanguageModel` with the thread's last 20 messages (`initialPrompts`); Write/Summarize receive the recent thread as `sharedContext`; text modes (Translate/Summarize/Rewrite/Proofread) resolve empty-or-reference input ("that", "it") to the last assistant result. History is rebuilt from `chrome.storage.local` each turn — live sessions are not persisted.
 - AI sessions are created and held in the side panel context. The service worker never runs AI; it only passes a context-menu payload through `chrome.storage.local`.
-- Threads and messages persist to `chrome.storage.local` under `assistant_threads_v1`; a thread's title is derived from its first user message.
+- Threads and messages persist to `chrome.storage.local` under `assistant_threads_v1`; a thread's title is derived from its first user message. A thread is only created/saved when the first message is sent — "＋" switches to an unsaved draft (`activeId === null`, delete disabled).
 
 ## Chrome Built-in AI (verify before changing)
 

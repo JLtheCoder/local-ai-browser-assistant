@@ -1,4 +1,4 @@
-import type { ModeId } from '../ai/types';
+import type { ModeId } from '../../ai/types';
 
 export interface ModeOptions {
   sourceLanguage: string;
@@ -116,3 +116,55 @@ export const REWRITE_LENGTHS = [
   { value: 'shorter', label: 'Shorter' },
   { value: 'longer', label: 'Longer' },
 ];
+
+/** A select rendered in the composer's per-mode options row. */
+export interface ModeOptionField {
+  key: keyof ModeOptions;
+  label: string;
+  choices: { value: string; label: string }[];
+  /** Prepend an "Auto-detect" (empty value) choice, e.g. for translation source. */
+  autoDetect?: boolean;
+}
+
+/** Declarative spec for the options row, keyed by mode (absent = no options). */
+export const MODE_FIELDS: Partial<Record<ModeId, { cols: number; fields: ModeOptionField[] }>> = {
+  translate: {
+    cols: 2,
+    fields: [
+      {
+        key: 'sourceLanguage',
+        label: 'From',
+        choices: LANGUAGES.map((l) => ({ value: l.code, label: l.name })),
+        autoDetect: true,
+      },
+      {
+        key: 'targetLanguage',
+        label: 'To',
+        choices: LANGUAGES.map((l) => ({ value: l.code, label: l.name })),
+      },
+    ],
+  },
+  summarize: {
+    cols: 3,
+    fields: [
+      { key: 'summarizeType', label: 'Type', choices: SUMMARY_TYPES },
+      { key: 'summarizeLength', label: 'Length', choices: SUMMARY_LENGTHS },
+      { key: 'summarizeFormat', label: 'Format', choices: SUMMARY_FORMATS },
+    ],
+  },
+  write: {
+    cols: 3,
+    fields: [
+      { key: 'writeTone', label: 'Tone', choices: WRITE_TONES },
+      { key: 'writeLength', label: 'Length', choices: WRITE_LENGTHS },
+      { key: 'writeFormat', label: 'Format', choices: WRITE_FORMATS },
+    ],
+  },
+  rewrite: {
+    cols: 2,
+    fields: [
+      { key: 'rewriteTone', label: 'Tone', choices: REWRITE_TONES },
+      { key: 'rewriteLength', label: 'Length', choices: REWRITE_LENGTHS },
+    ],
+  },
+};

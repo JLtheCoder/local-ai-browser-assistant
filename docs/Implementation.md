@@ -1,5 +1,18 @@
 # Implementation
 
+## 1.3 — Thread list popover & lazy thread creation
+
+Status: complete.
+
+- **☰ Conversations home screen:** the thread bar's list button toggles a dedicated
+  `ThreadHome` screen that replaces the chat area — every saved conversation as rows
+  (title, message count, last-updated), active row highlighted, per-row delete. Picking
+  a thread returns to the chat view. The thread dropdown stays in the bar for quick
+  switching.
+- **Lazy threads:** "＋" no longer creates a thread — it switches to an unsaved
+  _draft_ (dropdown shows "New thread…", delete disabled). A thread is only created
+  and persisted when the first message is sent. Draft text is cleared by "＋".
+
 ## 1.2 — Conversation context
 
 Status: complete. Threads are real conversations now: the model sees prior messages,
