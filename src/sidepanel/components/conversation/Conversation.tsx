@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Thread } from '../lib/threads';
+import type { Thread } from '../../lib/threads';
 import { Message } from './Message';
 
 export function Conversation({ thread }: { thread: Thread | null }) {

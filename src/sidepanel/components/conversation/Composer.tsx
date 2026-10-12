@@ -1,15 +1,15 @@
 import { useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
-import type { ModeId } from '../../ai/types';
-import { TEXT_MODES } from '../lib/context';
+import type { ModeId } from '../../../ai/types';
+import { TEXT_MODES } from '../../lib/context';
 import {
   MODE_CONTEXT_HINT,
-  MODE_FIELDS,
   MODE_LIST,
   MODE_PLACEHOLDER,
   type ModeOptions,
-} from '../lib/modeOptions';
-import { Button, Label, Select, TextArea } from './ui';
+} from '../../lib/modeOptions';
+import { ModeFields } from '../ModeFields';
+import { Button, TextArea } from '../ui';
 
 interface ComposerProps {
   value: string;
@@ -106,7 +106,9 @@ export function Composer({
         ))}
       </div>
 
-      <OptionsRow mode={selectedMode} options={options} onChange={onOptionsChange} />
+      <div className="mt-2">
+        <ModeFields mode={selectedMode} options={options} onChange={onOptionsChange} />
+      </div>
 
       <div className="mt-2 flex justify-end">
         {isRunning ? (
@@ -119,54 +121,6 @@ export function Composer({
           </Button>
         )}
       </div>
-    </div>
-  );
-}
-
-function OptionsRow({
-  mode,
-  options,
-  onChange,
-}: {
-  mode: ModeId;
-  options: ModeOptions;
-  onChange: (o: ModeOptions) => void;
-}) {
-  // The field's ModeOptions key travels in the select's `name`, so one handler
-  // covers every option in every mode.
-  const handleOptionChange = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      const key = e.currentTarget.name as keyof ModeOptions;
-      onChange({ ...options, [key]: e.currentTarget.value });
-    },
-    [onChange, options],
-  );
-
-  const config = MODE_FIELDS[mode];
-  if (!config) return null;
-
-  const colsClass = config.cols === 3 ? 'grid-cols-3' : 'grid-cols-2';
-
-  return (
-    <div className={`mt-2 grid gap-2 ${colsClass}`}>
-      {config.fields.map((field) => (
-        <div key={field.key}>
-          <Label>{field.label}</Label>
-          <Select
-            name={field.key}
-            value={options[field.key]}
-            onChange={handleOptionChange}
-            className="w-full"
-          >
-            {field.autoDetect && <option value="">Auto-detect</option>}
-            {field.choices.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-      ))}
     </div>
   );
 }

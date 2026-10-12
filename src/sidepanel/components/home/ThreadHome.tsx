@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { ChangeEvent, FocusEvent, KeyboardEvent, MouseEvent } from 'react';
-import type { Thread } from '../lib/threads';
+import type { Thread } from '../../lib/threads';
 
 function formatUpdated(ts: number): string {
   return new Date(ts).toLocaleString(undefined, {

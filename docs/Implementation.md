@@ -1,5 +1,37 @@
 # Implementation
 
+## 1.5 — Page selection toolbar & settings
+
+Status: complete. Select text anywhere and act on it without opening the panel first.
+
+- **Selection toolbar** (`src/content.ts`, injected on http/https pages in all frames):
+  finishing a text selection shows a shadow-DOM toolbar with the enabled quick actions —
+  Summarize, Translate, Proofread, Rewrite. It keeps the page selection alive while
+  clicking (mousedown is defaulted) and hides on scroll / outside click / Escape.
+- **Click → run:** the toolbar messages the service worker, which stores
+  `pendingSelection` / `pendingMode` / a unique `pendingActionId` and calls
+  `sidePanel.open({ tabId })` (a content-script click is a valid user gesture). The
+  panel consumes the payload on mount and via `chrome.storage.onChanged` while open,
+  then runs the mode immediately in a new thread titled `Summarize: <snippet>` etc.
+  The context menu keeps its old behavior: prefill the composer for review.
+- **Settings screen** (`components/settings/Settings.tsx`): a ⚙ button in the thread
+  bar between ＋ and 🗑 toggles it. Per-action enable toggles plus the default options
+  (translate languages, summary type/length/format, rewrite tone/length) are stored
+  under `assistant_settings_v1`; Save returns to the chat. With no action enabled the
+  toolbar stays hidden, so Save requires at least one.
+- **First run:** until preferences have been saved once, opening the panel lands on
+  the settings screen; afterwards it opens on chat (⚙ stays available).
+- **Composer defaults:** the composer starts from the saved options and only switches
+  to session-local values once an option is edited. A page action also selects its mode
+  in the composer and restores the saved options for it (so the pills/options row always
+  match what was just run).
+- **Build:** the content script must be a classic script, so it is compiled as its own
+  IIFE (`dist/content.js`) by `vite.content.config.ts` — the main build can't mix in
+  an IIFE entry.
+- Components were regrouped by screen (`components/home`, `components/conversation`,
+  `components/settings`); shared pieces (`ThreadBar`, `CapabilityBanner`, `ModeFields`,
+  `ui.tsx`) stay at the `components/` root.
+
 ## 1.4 — Inline thread renaming
 
 Status: complete.

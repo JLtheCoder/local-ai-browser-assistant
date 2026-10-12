@@ -1,22 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDefaultProvider } from '../ai/provider';
 import type { Capabilities, ModeId } from '../ai/types';
+import { isModeId, type AppSettings } from '../settings';
 import { CapabilityBanner } from './components/CapabilityBanner';
-import { Composer } from './components/Composer';
-import { Conversation } from './components/Conversation';
+import { Composer } from './components/conversation/Composer';
+import { Conversation } from './components/conversation/Conversation';
+import { ThreadHome } from './components/home/ThreadHome';
+import { Settings } from './components/settings/Settings';
 import { ThreadBar } from './components/ThreadBar';
-import { ThreadHome } from './components/ThreadHome';
+import { useSettings } from './hooks/useSettings';
 import { useThreads } from './hooks/useThreads';
-import { buildContext, TEXT_MODES } from './lib/context';
-import { DEFAULT_OPTIONS, type ModeOptions } from './lib/modeOptions';
+import { buildContext, TEXT_MODES, type SendContext } from './lib/context';
+import { MODE_LIST, type ModeOptions } from './lib/modeOptions';
 import { runMode } from './lib/runMode';
-import { newId } from './lib/threads';
+import { newId, truncate } from './lib/threads';
+
+type View = 'chat' | 'home' | 'settings';
+
+/** Keys the page selection toolbar / context menu write to `chrome.storage.local`. */
+const PENDING_KEYS = ['pendingSelection', 'pendingMode', 'pendingActionId'];
+
+/** Send context for page actions: a freshly created thread has no history yet. */
+const EMPTY_CONTEXT: SendContext = { history: [], lastResult: null };
 
 function isAbortError(err: unknown): boolean {
   if (err instanceof Error && err.name === 'AbortError') return true;
   return (
     typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'AbortError'
   );
+}
+
+function modeLabel(mode: ModeId): string {
+  return MODE_LIST.find((m) => m.id === mode)?.label ?? mode;
 }
 
 export default function App() {
@@ -33,14 +48,28 @@ export default function App() {
     appendChunk,
     setMessage,
   } = useThreads();
+  const {
+    settings,
+    loaded: settingsLoaded,
+    configured: settingsConfigured,
+    saveSettings,
+  } = useSettings();
 
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [selectedMode, setSelectedMode] = useState<ModeId>('prompt');
-  const [modeOptions, setModeOptions] = useState<ModeOptions>(DEFAULT_OPTIONS);
+  // Composer option overrides: until the user touches an option, the composer
+  // uses the stored preferences as its defaults.
+  const [modeOptionsOverride, setModeOptionsOverride] = useState<ModeOptions | null>(null);
   const [draft, setDraft] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-  const [view, setView] = useState<'chat' | 'home'>('chat');
+  // null = auto: the first run lands on the settings screen until preferences
+  // have been saved once; afterwards the app opens on the chat view.
+  const [view, setView] = useState<View | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const handledActionRef = useRef<string | null>(null);
+
+  const modeOptions = modeOptionsOverride ?? settings.options;
+  const resolvedView: View = view ?? (settingsLoaded && !settingsConfigured ? 'settings' : 'chat');
 
   useEffect(() => {
     let cancelled = false;
@@ -55,21 +84,124 @@ export default function App() {
     };
   }, [provider]);
 
-  // Context-menu selection → prefill the composer (routed to Summarize).
+  // Run one mode in `threadId`, streaming into the placeholder assistant message.
+  const executeRun = useCallback(
+    async (
+      threadId: string,
+      assistantId: string,
+      mode: ModeId,
+      content: string,
+      options: ModeOptions,
+      sendContext: SendContext,
+    ) => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setIsRunning(true);
+      let streamed = '';
+      try {
+        const result = await runMode(provider, mode, content, options, sendContext, {
+          signal: controller.signal,
+          onStream: (chunk) => {
+            streamed += chunk;
+            appendChunk(threadId, assistantId, chunk);
+          },
+        });
+        setMessage(threadId, assistantId, { content: result });
+      } catch (err) {
+        if (isAbortError(err)) {
+          if (!streamed) setMessage(threadId, assistantId, { content: '_Stopped._' });
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        setMessage(threadId, assistantId, { content: message, error: true });
+      } finally {
+        // A newer run may have replaced this controller — don't clobber it.
+        if (abortRef.current === controller) {
+          setIsRunning(false);
+          abortRef.current = null;
+        }
+      }
+    },
+    [appendChunk, provider, setMessage],
+  );
+
+  // A page selection action runs immediately in a fresh thread, using the
+  // preferences saved on the settings screen.
+  const handleRunSelection = useCallback(
+    (text: string, mode: ModeId) => {
+      abortRef.current?.abort();
+      const threadId = createThread(`${modeLabel(mode)}: ${truncate(text, 32)}`);
+      appendMessage(threadId, {
+        id: newId(),
+        role: 'user',
+        content: text,
+        mode,
+        createdAt: Date.now(),
+      });
+      const assistantId = newId();
+      appendMessage(threadId, {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        mode,
+        createdAt: Date.now(),
+      });
+      setDraft('');
+      // Mirror the action in the composer: select its mode and show the options
+      // it ran with (the saved preferences), not any session-local overrides.
+      setSelectedMode(mode);
+      setModeOptionsOverride(null);
+      setView('chat');
+      void executeRun(threadId, assistantId, mode, text, settings.options, EMPTY_CONTEXT);
+    },
+    [appendMessage, createThread, executeRun, settings.options],
+  );
+
+  // Page actions and the context menu write pending* keys to chrome.storage.local.
+  // Consume them when the panel opens and while it is already open (storage change).
   useEffect(() => {
+    if (!settingsLoaded) return;
     if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-    void chrome.storage.local.get(['pendingSelection', 'pendingMode']).then((v) => {
-      const text = typeof v.pendingSelection === 'string' ? v.pendingSelection : '';
-      const mode = typeof v.pendingMode === 'string' ? (v.pendingMode as ModeId) : 'summarize';
-      if (text) {
+    let cancelled = false;
+
+    const consume = (value: Record<string, unknown>) => {
+      if (cancelled) return;
+      if (value.pendingSelection === undefined && value.pendingActionId === undefined) return;
+      const text = typeof value.pendingSelection === 'string' ? value.pendingSelection.trim() : '';
+      const mode = isModeId(value.pendingMode) ? value.pendingMode : 'summarize';
+      const actionId = typeof value.pendingActionId === 'string' ? value.pendingActionId : null;
+      void chrome.storage.local.remove(PENDING_KEYS);
+      if (!text) return;
+
+      if (actionId) {
+        // Page selection toolbar: run immediately in a new thread.
+        if (handledActionRef.current === actionId) return;
+        handledActionRef.current = actionId;
+        handleRunSelection(text, mode);
+      } else {
+        // Context menu: prefill the composer for review.
         setDraft(text);
         setSelectedMode(mode);
+        setView('chat');
       }
-      if (v.pendingSelection !== undefined) {
-        void chrome.storage.local.remove(['pendingSelection', 'pendingMode']);
-      }
-    });
-  }, []);
+    };
+
+    void chrome.storage.local.get(PENDING_KEYS).then(consume);
+
+    const listener: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (
+      changes,
+      area,
+    ) => {
+      if (area !== 'local') return;
+      if (!PENDING_KEYS.some((key) => key in changes)) return;
+      void chrome.storage.local.get(PENDING_KEYS).then(consume);
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => {
+      cancelled = true;
+      chrome.storage.onChanged.removeListener(listener);
+    };
+  }, [settingsLoaded, handleRunSelection]);
 
   // Context is derived from the thread as it stands right now: recent turns for
   // the model + the latest assistant result for "that"/empty-input resolution.
@@ -102,43 +234,9 @@ export default function App() {
       });
       setDraft('');
 
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsRunning(true);
-      let streamed = '';
-      try {
-        const result = await runMode(provider, mode, content, modeOptions, ctx, {
-          signal: controller.signal,
-          onStream: (chunk) => {
-            streamed += chunk;
-            appendChunk(threadId, assistantId, chunk);
-          },
-        });
-        setMessage(threadId, assistantId, { content: result });
-      } catch (err) {
-        if (isAbortError(err)) {
-          if (!streamed) setMessage(threadId, assistantId, { content: '_Stopped._' });
-          return;
-        }
-        const message = err instanceof Error ? err.message : String(err);
-        setMessage(threadId, assistantId, { content: message, error: true });
-      } finally {
-        setIsRunning(false);
-        abortRef.current = null;
-      }
+      await executeRun(threadId, assistantId, mode, content, modeOptions, ctx);
     },
-    [
-      activeId,
-      appendChunk,
-      appendMessage,
-      ctx,
-      createThread,
-      isRunning,
-      modeOptions,
-      provider,
-      selectedMode,
-      setMessage,
-    ],
+    [activeId, appendMessage, createThread, ctx, executeRun, isRunning, modeOptions, selectedMode],
   );
 
   const handleSendDraft = useCallback(() => {
@@ -158,8 +256,24 @@ export default function App() {
   }, [setActiveId]);
 
   const handleToggleList = useCallback(() => {
-    setView((current) => (current === 'home' ? 'chat' : 'home'));
+    setView(resolvedView === 'home' ? 'chat' : 'home');
+  }, [resolvedView]);
+
+  const handleToggleSettings = useCallback(() => {
+    setView(resolvedView === 'settings' ? 'chat' : 'settings');
+  }, [resolvedView]);
+
+  const handleOptionsChange = useCallback((next: ModeOptions) => {
+    setModeOptionsOverride(next);
   }, []);
+
+  const handleSaveSettings = useCallback(
+    (next: AppSettings) => {
+      void saveSettings(next);
+      setView('chat');
+    },
+    [saveSettings],
+  );
 
   // Picking a thread (dropdown or home screen) always lands on the chat view.
   const handleSelectThread = useCallback(
@@ -178,11 +292,23 @@ export default function App() {
         onSelect={handleSelectThread}
         onNew={handleNewThread}
         onDelete={deleteThread}
-        listView={view === 'home'}
+        listView={resolvedView === 'home'}
         onToggleList={handleToggleList}
+        settingsView={resolvedView === 'settings'}
+        onToggleSettings={handleToggleSettings}
       />
       <CapabilityBanner capabilities={capabilities} />
-      {view === 'home' ? (
+      {resolvedView === 'settings' ? (
+        // Mount only once the stored settings have loaded so the draft starts
+        // from real values (the screen is reached via the ⚙ button or first run).
+        settingsLoaded ? (
+          <Settings
+            settings={settings}
+            firstRun={!settingsConfigured}
+            onSave={handleSaveSettings}
+          />
+        ) : null
+      ) : resolvedView === 'home' ? (
         <ThreadHome
           threads={threads}
           activeId={activeId}
@@ -199,7 +325,7 @@ export default function App() {
             selectedMode={selectedMode}
             onSelectMode={setSelectedMode}
             options={modeOptions}
-            onOptionsChange={setModeOptions}
+            onOptionsChange={handleOptionsChange}
             onSend={handleSendDraft}
             onStop={handleStop}
             isRunning={isRunning}

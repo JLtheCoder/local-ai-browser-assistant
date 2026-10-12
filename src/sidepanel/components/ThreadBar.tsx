@@ -10,6 +10,8 @@ export function ThreadBar({
   onDelete,
   listView,
   onToggleList,
+  settingsView,
+  onToggleSettings,
 }: {
   threads: Thread[];
   activeId: string | null;
@@ -19,6 +21,9 @@ export function ThreadBar({
   /** True when the conversations list screen is showing. */
   listView: boolean;
   onToggleList: () => void;
+  /** True when the settings screen is showing. */
+  settingsView: boolean;
+  onToggleSettings: () => void;
 }) {
   const handleSelect = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
@@ -67,6 +72,17 @@ export function ThreadBar({
         className="rounded-md px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
       >
         ＋
+      </button>
+      <button
+        type="button"
+        onClick={onToggleSettings}
+        title="Settings"
+        aria-pressed={settingsView}
+        className={`rounded-md px-2 py-1 text-sm transition hover:bg-zinc-800 ${
+          settingsView ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-300'
+        }`}
+      >
+        ⚙
       </button>
       <button
         type="button"

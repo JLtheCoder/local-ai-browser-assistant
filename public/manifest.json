@@ -5,6 +5,14 @@
   "description": "On-device AI in the side panel via Chrome Built-in AI (Gemini Nano).",
   "minimum_chrome_version": "138",
   "permissions": ["sidePanel", "contextMenus", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

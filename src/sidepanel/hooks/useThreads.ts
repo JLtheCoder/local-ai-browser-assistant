@@ -28,11 +28,11 @@ export function useThreads() {
     void chrome.storage.local.set({ [STORAGE_KEY]: threads });
   }, [threads, loaded]);
 
-  const createThread = useCallback((): string => {
+  const createThread = useCallback((title = 'New thread'): string => {
     const id = newId();
     const thread: Thread = {
       id,
-      title: 'New thread',
+      title,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: [],
