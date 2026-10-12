@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDefaultProvider } from '../ai/provider';
 import type { Capabilities, ModeId } from '../ai/types';
+import { buildContext, TEXT_MODES } from './context';
 import { Composer } from './Composer';
 import { Conversation } from './Conversation';
 import { ThreadBar } from './ThreadBar';
@@ -66,12 +67,17 @@ export default function App() {
     });
   }, []);
 
+  // Context is derived from the thread as it stands right now: recent turns for
+  // the model + the latest assistant result for "that"/empty-input resolution.
+  const ctx = buildContext(activeThread);
+
   const handleSend = async (text: string) => {
+    const mode = selectedMode;
     const content = text.trim();
-    if (!content || isRunning) return;
+    const resolvable = TEXT_MODES.includes(mode) && ctx.lastResult !== null;
+    if ((!content && !resolvable) || isRunning) return;
 
     const threadId = activeId ?? createThread();
-    const mode = selectedMode;
 
     appendMessage(threadId, {
       id: newId(),
@@ -93,14 +99,21 @@ export default function App() {
     const controller = new AbortController();
     abortRef.current = controller;
     setIsRunning(true);
+    let streamed = '';
     try {
-      const result = await runMode(provider, mode, content, modeOptions, {
+      const result = await runMode(provider, mode, content, modeOptions, ctx, {
         signal: controller.signal,
-        onStream: (chunk) => appendChunk(threadId, assistantId, chunk),
+        onStream: (chunk) => {
+          streamed += chunk;
+          appendChunk(threadId, assistantId, chunk);
+        },
       });
       setMessage(threadId, assistantId, { content: result });
     } catch (err) {
-      if (isAbortError(err)) return;
+      if (isAbortError(err)) {
+        if (!streamed) setMessage(threadId, assistantId, { content: '_Stopped._' });
+        return;
+      }
       const message = err instanceof Error ? err.message : String(err);
       setMessage(threadId, assistantId, { content: message, error: true });
     } finally {
@@ -130,6 +143,7 @@ export default function App() {
         onSend={() => void handleSend(draft)}
         onStop={() => abortRef.current?.abort()}
         isRunning={isRunning}
+        lastResult={ctx.lastResult}
       />
     </div>
   );

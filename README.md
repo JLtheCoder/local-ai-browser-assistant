@@ -29,7 +29,10 @@ Verify the model: `chrome://on-device-internals`.
 
 - UI talks only to the `AIProvider` interface (`src/ai/types.ts`).
 - `src/ai/chrome.ts` is the only file that touches Chrome's built-in AI globals.
+- Prompt is multi-turn: the thread's recent messages are seeded as `initialPrompts`.
+  In Translate/Summarize/Rewrite/Proofread, type "that" (or send with no text) to act
+  on the previous result.
 - Swap in a different backend (e.g. a local llama.cpp server) by adding a provider in
   `src/ai/provider.ts` — no UI changes required.
 
-See `AGENTS.md` for development rules and `implementation.md` for the version history (v1, 1.1).
+See `AGENTS.md` for development rules and `docs/Implementation.md` for the version history (v1, 1.1, 1.2).

@@ -2,19 +2,31 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from './threads';
 
+function modeLabel(mode: string): string {
+  return mode.charAt(0).toUpperCase() + mode.slice(1);
+}
+
 export function Message({ message }: { message: ChatMessage }) {
+  const label = (
+    <div className="mb-0.5 text-[10px] uppercase tracking-wide text-zinc-500">
+      {modeLabel(message.mode)}
+    </div>
+  );
+
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end">
+        {label}
         <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-lg rounded-br-sm bg-indigo-600 px-3 py-2 text-sm text-white">
-          {message.content}
+          {message.content === '' ? <em>Using the last result</em> : message.content}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-start">
+    <div className="flex flex-col items-start">
+      {label}
       <div className="min-w-0 max-w-[95%]">
         {message.content === '' ? (
           <div className="px-1 py-1 text-sm text-zinc-500">Thinking…</div>

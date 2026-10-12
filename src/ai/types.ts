@@ -16,8 +16,15 @@ export interface StreamOptions {
   onStream?: (chunk: string) => void;
 }
 
+export interface ConversationTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface PromptRequest extends StreamOptions {
   prompt: string;
+  /** Prior conversation turns, fed to the model as context for multi-turn chats. */
+  history?: ConversationTurn[];
 }
 
 export interface TranslateRequest extends StreamOptions {
@@ -31,6 +38,7 @@ export interface SummarizeRequest extends StreamOptions {
   type?: string;
   format?: string;
   length?: string;
+  sharedContext?: string;
 }
 
 export interface WriteRequest extends StreamOptions {
@@ -38,6 +46,7 @@ export interface WriteRequest extends StreamOptions {
   tone?: string;
   format?: string;
   length?: string;
+  sharedContext?: string;
 }
 
 export interface RewriteRequest extends StreamOptions {

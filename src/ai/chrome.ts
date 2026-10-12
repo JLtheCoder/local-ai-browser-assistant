@@ -64,11 +64,15 @@ export const chromeProvider: AIProvider = {
     };
   },
 
-  async prompt({ prompt, signal, onStream }: PromptRequest): Promise<string> {
+  async prompt({ prompt, history, signal, onStream }: PromptRequest): Promise<string> {
     if (!has('LanguageModel')) {
       throw new Error('Prompt API (LanguageModel) is not available in this browser.');
     }
-    const session = await w.LanguageModel.create({ signal });
+    // Seed the session with prior turns so Prompt mode has conversational memory.
+    const session = await w.LanguageModel.create({
+      ...(history && history.length > 0 ? { initialPrompts: history } : {}),
+      signal,
+    });
     if (onStream && typeof session.promptStreaming === 'function') {
       return collect(session.promptStreaming(prompt, { signal }), onStream);
     }
@@ -115,17 +119,25 @@ export const chromeProvider: AIProvider = {
     type = 'key-points',
     format = 'markdown',
     length = 'medium',
+    sharedContext,
     signal,
     onStream,
   }: SummarizeRequest): Promise<string> {
     if (!has('Summarizer')) {
       throw new Error('Summarizer API is not available in this browser.');
     }
-    const availability = await w.Summarizer.availability({ type, format, length });
+    // Pass the same options to availability() and create(), per Chrome's guidance.
+    const taskOptions = {
+      type,
+      format,
+      length,
+      ...(sharedContext ? { sharedContext } : {}),
+    };
+    const availability = await w.Summarizer.availability(taskOptions);
     if (availability === 'unavailable') {
       throw new Error('Summarizer is unavailable for these options.');
     }
-    const summarizer = await w.Summarizer.create({ type, format, length });
+    const summarizer = await w.Summarizer.create(taskOptions);
     if (onStream && typeof summarizer.summarizeStreaming === 'function') {
       return collect(summarizer.summarizeStreaming(text, { signal }), onStream);
     }
@@ -137,6 +149,7 @@ export const chromeProvider: AIProvider = {
     tone = 'neutral',
     format = 'plain-text',
     length = 'medium',
+    sharedContext,
     signal,
     onStream,
   }: WriteRequest): Promise<string> {
@@ -145,7 +158,12 @@ export const chromeProvider: AIProvider = {
         'Writer API is not available. Enable chrome://flags/#writer-api-for-gemini-nano.',
       );
     }
-    const writer = await w.Writer.create({ tone, format, length });
+    const writer = await w.Writer.create({
+      tone,
+      format,
+      length,
+      ...(sharedContext ? { sharedContext } : {}),
+    });
     if (onStream && typeof writer.writeStreaming === 'function') {
       return collect(writer.writeStreaming(prompt, { signal }), onStream);
     }

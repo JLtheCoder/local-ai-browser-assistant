@@ -56,7 +56,9 @@ export function useThreads() {
       prev.map((t) => {
         if (t.id !== threadId) return t;
         const title =
-          t.title === 'New thread' && message.role === 'user' ? truncate(message.content) : t.title;
+          t.title === 'New thread' && message.role === 'user' && message.content.trim()
+            ? truncate(message.content)
+            : t.title;
         return { ...t, title, updatedAt: Date.now(), messages: [...t.messages, message] };
       }),
     );

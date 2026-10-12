@@ -28,9 +28,9 @@ export const DEFAULT_OPTIONS: ModeOptions = {
 
 export const MODE_LIST: { id: ModeId; label: string }[] = [
   { id: 'prompt', label: 'Prompt' },
-  { id: 'translate', label: 'Translate' },
   { id: 'summarize', label: 'Summarize' },
   { id: 'write', label: 'Write' },
+  { id: 'translate', label: 'Translate' },
   { id: 'rewrite', label: 'Rewrite' },
   { id: 'proofread', label: 'Proofread' },
 ];
@@ -42,6 +42,12 @@ export const MODE_PLACEHOLDER: Record<ModeId, string> = {
   write: 'Describe what to write…',
   rewrite: 'Text to rewrite…',
   proofread: 'Text to proofread…',
+};
+
+/** Modes that draw on the thread get a short note under the composer input. */
+export const MODE_CONTEXT_HINT: Partial<Record<ModeId, string>> = {
+  summarize: 'Uses this thread as context.',
+  write: 'Uses this thread as context.',
 };
 
 export const LANGUAGES = [

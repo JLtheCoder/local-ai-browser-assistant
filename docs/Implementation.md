@@ -1,5 +1,32 @@
 # Implementation
 
+## 1.2 — Conversation context
+
+Status: complete. Threads are real conversations now: the model sees prior messages,
+and switching modes mid-thread builds on what came before.
+
+### What changed in 1.2
+
+- **Prompt mode is multi-turn.** The last 20 thread messages are seeded into
+  `LanguageModel` via `initialPrompts` on each send, so the model remembers the
+  conversation and resolves pronouns ("that", "it"). History is rebuilt from
+  `chrome.storage.local` every turn — live sessions aren't persisted, so this
+  survives panel reloads.
+- **Reference resolution for text modes.** Translate, Summarize, Rewrite, and Proofread
+  act on the last assistant result when the input is empty or a standalone reference
+  ("that", "it", "the result", "previous", …). Send is enabled with no text in that
+  case, with a hint shown under the input.
+- **Shared context for task APIs.** Write and Summarize receive the recent conversation
+  as `sharedContext` (capped at ~4k chars).
+- In-flight and error replies are excluded from history and can't be referenced; an
+  aborted response with no output shows "_Stopped._" instead of a stuck "Thinking…".
+- Bubbles now carry a small mode label so mode switches are visible in the thread.
+- **Composer clarity:** pills reordered (Prompt, Summarize, Write, Translate, Rewrite,
+  Proofread), and Write/Summarize show a "Uses this thread as context." note; the
+  actionable "send with no text" hint takes priority when both would apply.
+- Provider seam grew slightly: `PromptRequest.history`, `sharedContext` on
+  Summarize/Write requests — all mapped in `src/ai/chrome.ts` only.
+
 ## 1.1 — OpenCode-style chat UI
 
 Status: complete. Replaces the v1 form-per-mode layout with a chat-style side panel:

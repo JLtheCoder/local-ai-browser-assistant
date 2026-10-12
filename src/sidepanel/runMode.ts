@@ -1,4 +1,5 @@
 import type { AIProvider, ModeId } from '../ai/types';
+import { historyToSharedContext, resolveText, type SendContext } from './context';
 import type { ModeOptions } from './modeOptions';
 
 export interface StreamCtx {
@@ -9,13 +10,23 @@ export interface StreamCtx {
 export async function runMode(
   provider: AIProvider,
   mode: ModeId,
-  input: string,
+  rawInput: string,
   options: ModeOptions,
+  ctx: SendContext,
   stream: StreamCtx,
 ): Promise<string> {
+  // Prompt and Write keep their input as-is; text modes resolve "that"/empty
+  // references against the last result from the thread.
+  const input = resolveText(mode, rawInput.trim(), ctx);
+
   switch (mode) {
     case 'prompt':
-      return provider.prompt({ prompt: input, signal: stream.signal, onStream: stream.onStream });
+      return provider.prompt({
+        prompt: input,
+        history: ctx.history,
+        signal: stream.signal,
+        onStream: stream.onStream,
+      });
     case 'translate':
       return provider.translate({
         text: input,
@@ -30,6 +41,7 @@ export async function runMode(
         type: options.summarizeType,
         length: options.summarizeLength,
         format: options.summarizeFormat,
+        sharedContext: historyToSharedContext(ctx.history),
         signal: stream.signal,
         onStream: stream.onStream,
       });
@@ -39,6 +51,7 @@ export async function runMode(
         tone: options.writeTone,
         length: options.writeLength,
         format: options.writeFormat,
+        sharedContext: historyToSharedContext(ctx.history),
         signal: stream.signal,
         onStream: stream.onStream,
       });

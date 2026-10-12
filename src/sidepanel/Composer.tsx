@@ -1,8 +1,10 @@
 import type { KeyboardEvent } from 'react';
 import type { ModeId } from '../ai/types';
 import { Button, Label, Select, TextArea } from './components';
+import { TEXT_MODES } from './context';
 import {
   LANGUAGES,
+  MODE_CONTEXT_HINT,
   MODE_LIST,
   MODE_PLACEHOLDER,
   REWRITE_LENGTHS,
@@ -26,6 +28,8 @@ interface ComposerProps {
   onSend: () => void;
   onStop: () => void;
   isRunning: boolean;
+  /** Latest assistant result, or null. Enables "send with no text" for text modes. */
+  lastResult: string | null;
 }
 
 export function Composer({
@@ -38,8 +42,13 @@ export function Composer({
   onSend,
   onStop,
   isRunning,
+  lastResult,
 }: ComposerProps) {
-  const canSend = value.trim().length > 0 && !isRunning;
+  const hasText = value.trim().length > 0;
+  const canUseLast =
+    !hasText && lastResult !== null && TEXT_MODES.includes(selectedMode) && !isRunning;
+  const canSend = (hasText || canUseLast) && !isRunning;
+  const contextHint = MODE_CONTEXT_HINT[selectedMode];
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -55,8 +64,19 @@ export function Composer({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={MODE_PLACEHOLDER[selectedMode]}
+        placeholder={
+          canUseLast
+            ? `Empty → acts on the last ${selectedMode} result…`
+            : MODE_PLACEHOLDER[selectedMode]
+        }
       />
+      {canUseLast ? (
+        <div className="mt-1 text-xs text-zinc-500">
+          Send with no text to act on the last result, or type “that” / “it”.
+        </div>
+      ) : (
+        contextHint && <div className="mt-1 text-xs text-zinc-500">{contextHint}</div>
+      )}
 
       <div className="mt-2 flex flex-wrap gap-1">
         {MODE_LIST.map((m) => (
