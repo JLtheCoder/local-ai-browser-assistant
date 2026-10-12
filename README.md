@@ -1,7 +1,7 @@
 # Local AI Browser Assistant
 
 On-device AI in the Chrome side panel, powered by Chrome Built-in AI (Gemini Nano).
-Six modes: Prompt, Translate, Summarize, Write, Rewrite, Proofread.
+A chat-style UI with persistent threads and six modes: Prompt, Translate, Summarize, Write, Rewrite, Proofread.
 
 ## Develop
 
@@ -32,4 +32,4 @@ Verify the model: `chrome://on-device-internals`.
 - Swap in a different backend (e.g. a local llama.cpp server) by adding a provider in
   `src/ai/provider.ts` — no UI changes required.
 
-See `AGENTS.md` for development rules and `implementation.md` for the v1 scope.
+See `AGENTS.md` for development rules and `implementation.md` for the version history (v1, 1.1).

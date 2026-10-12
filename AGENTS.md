@@ -3,7 +3,7 @@
 Chrome MV3 extension: on-device AI in the side panel via Chrome Built-in AI
 (Gemini Nano). React 19 + TypeScript + Vite 7 + Tailwind CSS v4.
 
-Six modes, one side panel: Prompt, Translate, Summarize, Write, Rewrite, Proofread.
+Chat-style side panel with persistent threads and six modes: Prompt, Translate, Summarize, Write, Rewrite, Proofread.
 
 ## Commands
 
@@ -20,7 +20,7 @@ Six modes, one side panel: Prompt, Translate, Summarize, Write, Rewrite, Proofre
 
 - `public/manifest.json` — MV3 source of truth, copied to `dist/` on build. `side_panel.default_path: sidepanel.html`, `background.service_worker: background.js`.
 - `sidepanel.html` — Vite HTML entry for the side panel; loads `src/sidepanel/main.tsx`.
-- `src/sidepanel/` — React UI: `App.tsx` (mode tabs + capability banner), `modes/` (one file per mode), `components.tsx`, `hooks/`.
+- `src/sidepanel/` — React chat UI: `App.tsx` (thread/composer orchestration + capability banner), `ThreadBar.tsx` (thread dropdown + new/delete), `Conversation.tsx` + `Message.tsx` (markdown chat), `Composer.tsx` (input box, mode pills, per-mode options), `modeOptions.ts` (mode metadata + defaults), `runMode.ts` (mode → provider dispatch), `threads.ts` (thread/message model), `components.tsx`, `hooks/useThreads.ts` (thread state + `chrome.storage.local` persistence).
 - `src/ai/` — the provider seam:
   - `types.ts` — `AIProvider` interface + request/capability types. The UI depends only on this.
   - `chrome.ts` — the ONLY file that touches Chrome Built-in AI globals.
@@ -32,6 +32,7 @@ Six modes, one side panel: Prompt, Translate, Summarize, Write, Rewrite, Proofre
 
 - **Provider seam:** UI components call the `AIProvider` interface, never the Chrome globals directly. Swap backends (e.g. a local llama.cpp server later) by adding a provider in `src/ai/provider.ts` — no mode/UI changes.
 - AI sessions are created and held in the side panel context. The service worker never runs AI; it only passes a context-menu payload through `chrome.storage.local`.
+- Threads and messages persist to `chrome.storage.local` under `assistant_threads_v1`; a thread's title is derived from its first user message.
 
 ## Chrome Built-in AI (verify before changing)
 
@@ -49,7 +50,7 @@ Status as of late 2026:
 ## Gotchas
 
 - `public/manifest.json` must be valid JSON — no comments. Chrome rejects JSON with comments.
-- Load from `dist/` after `npm run build`; `dist/` is the real extension root (manifest + icons are copied there by `vite-plugin-static-copy`).
+- Load from `dist/` after `npm run build`; `dist/` is the real extension root (`public/manifest.json` and `public/icons/` are copied there by Vite's built-in `publicDir` handling — no copy plugin).
 - Permissions for v1: `sidePanel`, `contextMenus`, `storage`. `activeTab` / `scripting` / `host_permissions` are reserved for a future "read current page / selection" feature — add them only when that ships.
 - Side panel + service worker cannot use blocking APIs synchronously. Stream with `for await` and pass an `AbortSignal` so requests can be cancelled.
 - Keep the Chrome setup/flags list in `README.md` in sync with the capability banner and this file.

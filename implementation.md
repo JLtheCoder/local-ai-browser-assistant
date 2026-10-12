@@ -1,5 +1,28 @@
 # Implementation
 
+## 1.1 — OpenCode-style chat UI
+
+Status: complete. Replaces the v1 form-per-mode layout with a chat-style side panel:
+a top thread bar, a scrollable conversation, and a bottom composer with a mode selector.
+
+### What changed in 1.1
+
+- Chat UI: thread dropdown in a top bar (New / Delete), scrollable conversation, bottom
+  composer with a user input box and the six mode pills below it.
+- Threads persist to `chrome.storage.local` (`assistant_threads_v1`); titles derive from
+  the first message.
+- Per-mode options: a compact options row appears for Translate (languages), Summarize
+  (type/length/format), Write (tone/length/format), and Rewrite (tone/length).
+- Assistant messages render Markdown (react-markdown + remark-gfm + @tailwindcss/typography).
+- Streaming, stop, and error handling carried over from v1's provider seam.
+- Context-menu "Send selection" now prefills the composer (routed to Summarize) instead
+  of filling a form.
+
+### Still out of scope
+
+- Reading current-page text (Selection/Page buttons) — permissions reserved, not requested.
+- A local-LLM (llama.cpp) provider — the `AIProvider` seam is ready for it.
+
 ## v1 — on-device AI via Chrome Built-in AI
 
 Status: scaffold complete. Six modes in a side panel, backed by Chrome's built-in
