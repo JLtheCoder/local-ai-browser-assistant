@@ -111,25 +111,38 @@ export function Composer({
       )}
 
       {/* Page context toggle — only for modes that support it */}
-      {supportsPageContext(selectedMode) && pageContextAvailable && (
+      {supportsPageContext(selectedMode) && (
         <div className="mt-2">
-          <label className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer">
+          <label
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition rounded-md ${
+              pageContextAvailable
+                ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer'
+                : 'text-zinc-600 cursor-not-allowed'
+            }`}
+          >
             <input
               type="checkbox"
               checked={usePageContext}
               onChange={handlePageContextToggle}
-              className="accent-indigo-500"
-              title="Include the current page as context"
+              disabled={!pageContextAvailable}
+              className="accent-indigo-500 disabled:opacity-40"
+              title={
+                pageContextAvailable
+                  ? 'Include the current page as context'
+                  : 'Cannot read this page (chrome://, PDF, or tab opened before extension loaded)'
+              }
             />
             <span className="whitespace-nowrap">📄 Use this page as context</span>
           </label>
-          {usePageContext && (
+          {usePageContext && pageContextAvailable && (
             <div className="mt-1 text-xs text-indigo-300">Using the current page as context.</div>
           )}
+          {usePageContext && !pageContextAvailable && (
+            <div className="mt-1 text-xs text-amber-300">
+              Cannot read this page — context unavailable.
+            </div>
+          )}
         </div>
-      )}
-      {supportsPageContext(selectedMode) && !pageContextAvailable && usePageContext && (
-        <div className="mt-2 text-xs text-amber-300">Cannot read this page — toggle ignored.</div>
       )}
 
       <div className="mt-2 flex flex-wrap gap-1">
