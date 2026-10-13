@@ -1,4 +1,4 @@
-export type CapabilityStatus = 'available' | 'downloading' | 'unavailable';
+export type CapabilityStatus = 'available' | 'downloadable' | 'downloading' | 'unavailable';
 
 export type ModeId = 'prompt' | 'translate' | 'summarize' | 'write' | 'rewrite' | 'proofread';
 
@@ -9,6 +9,16 @@ export interface Capabilities {
   write: CapabilityStatus;
   rewrite: CapabilityStatus;
   proofread: CapabilityStatus;
+}
+
+export type CapabilityId = keyof Capabilities;
+
+export interface DownloadRequest {
+  capability: CapabilityId;
+  /** Required for `translate`: its model is per language pair. */
+  targetLanguage?: string;
+  /** Fraction of the download completed, 0–1 (not every API reports progress). */
+  onProgress?: (progress: number) => void;
 }
 
 export interface StreamOptions {
@@ -73,6 +83,8 @@ export interface AIProvider {
   readonly id: string;
   readonly label: string;
   capabilities(): Promise<Capabilities>;
+  /** Fetches the model behind a capability (a no-op when it is already ready). */
+  download(request: DownloadRequest): Promise<void>;
   prompt(request: PromptRequest): Promise<string>;
   translate(request: TranslateRequest): Promise<string>;
   summarize(request: SummarizeRequest): Promise<string>;

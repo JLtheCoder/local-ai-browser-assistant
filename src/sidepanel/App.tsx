@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDefaultProvider } from '../ai/provider';
-import type { Capabilities, ModeId } from '../ai/types';
+import type { Capabilities, CapabilityId, ModeId } from '../ai/types';
 import { isModeId, type AppSettings } from '../settings';
 import { CapabilityBanner } from './components/CapabilityBanner';
 import { Composer } from './components/conversation/Composer';
@@ -58,6 +58,13 @@ export default function App() {
   } = useSettings();
 
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
+  const [modelDownload, setModelDownload] = useState<{
+    id: CapabilityId;
+    progress: number | null;
+  } | null>(null);
+  const [downloadError, setDownloadError] = useState<{ id: CapabilityId; message: string } | null>(
+    null,
+  );
   const [selectedMode, setSelectedMode] = useState<ModeId>('prompt');
   // Composer option overrides: until the user touches an option, the composer
   // uses the stored preferences as its defaults.
@@ -87,6 +94,56 @@ export default function App() {
       cancelled = true;
     };
   }, [provider]);
+
+  const refreshCapabilities = useCallback(async () => {
+    try {
+      setCapabilities(await provider.capabilities());
+    } catch {
+      // Keep the last known statuses when a probe fails.
+    }
+  }, [provider]);
+
+  // Chrome may run model downloads on its own (another Built-in AI surface, or
+  // a download surviving a panel reload). Poll while any is in progress so the
+  // banner clears without the user having to reopen the panel.
+  const anyDownloading = capabilities
+    ? Object.values(capabilities).some((status) => status === 'downloading')
+    : false;
+  useEffect(() => {
+    if (!anyDownloading) return;
+    const timer = setInterval(() => {
+      void refreshCapabilities();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [anyDownloading, refreshCapabilities]);
+
+  const handleDownloadModel = useCallback(
+    (id: CapabilityId) => {
+      setDownloadError(null);
+      setModelDownload({ id, progress: null });
+      provider
+        .download({
+          capability: id,
+          targetLanguage: settings.options.targetLanguage,
+          onProgress: (progress) => {
+            setModelDownload((current) =>
+              current && current.id === id ? { ...current, progress } : current,
+            );
+          },
+        })
+        .catch((err: unknown) => {
+          setDownloadError({
+            id,
+            message: err instanceof Error ? err.message : 'The model download failed.',
+          });
+        })
+        .finally(() => {
+          setModelDownload((current) => (current && current.id === id ? null : current));
+          void refreshCapabilities();
+        });
+    },
+    [provider, refreshCapabilities, settings.options.targetLanguage],
+  );
 
   // Run one mode in `threadId`, streaming into the placeholder assistant message.
   const executeRun = useCallback(
@@ -417,7 +474,12 @@ export default function App() {
         settingsView={resolvedView === 'settings'}
         onToggleSettings={handleToggleSettings}
       />
-      <CapabilityBanner capabilities={capabilities} />
+      <CapabilityBanner
+        capabilities={capabilities}
+        download={modelDownload}
+        downloadError={downloadError}
+        onDownload={handleDownloadModel}
+      />
       {resolvedView === 'settings' ? (
         // Mount only once the stored settings have loaded so the draft starts
         // from real values (the screen is reached via the ⚙ button or first run).

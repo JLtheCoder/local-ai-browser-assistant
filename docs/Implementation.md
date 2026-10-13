@@ -1,5 +1,24 @@
 # Implementation
 
+## 1.6.1 — Capability banner separates "not downloaded" from "downloading"
+
+Status: complete. Patch release (package 0.2.1).
+
+- **Root cause:** Chrome's `availability()` returns `'downloadable'` for a model that
+  exists but was never fetched — no download is in progress. The provider folded it into
+  `'downloading'`, so the banner showed "Downloading models: proofread…" indefinitely
+  (most visible for Proofreader, whose model other Chrome surfaces rarely fetch).
+- **Statuses:** `CapabilityStatus` now carries `'downloadable'` on its own; the banner
+  shows "Not downloaded yet: …" with a small **Download** button per model.
+- **Download:** `AIProvider.download({ capability, targetLanguage?, onProgress? })`
+  creates a throwaway session (that call is what triggers Chrome's fetch) and destroys
+  it; `downloadprogress` is normalized to a 0–1 fraction (fraction or older byte-style
+  events) and shown as a percentage. A failed download shows a banner line instead of
+  resetting silently.
+- **Refresh:** the panel re-probes `availability()` when a download settles and polls
+  every 3s while any capability reports `'downloading'`, so a Chrome-managed download
+  clears the banner without the user reopening the panel.
+
 ## 1.6 — Page context & web search suggestions
 
 Status: complete. The assistant can now read the current page and suggest web searches.

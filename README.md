@@ -61,4 +61,4 @@ Verify the model: `chrome://on-device-internals`.
 - Swap in a different backend (e.g. a local llama.cpp server) by adding a provider in
   `src/ai/provider.ts` — no UI changes required.
 
-See `AGENTS.md` for development rules and `docs/Implementation.md` for the version history (v1, 1.1 … 1.6).
+See `AGENTS.md` for development rules and `docs/Implementation.md` for the version history (v1, 1.1 … 1.6.1).

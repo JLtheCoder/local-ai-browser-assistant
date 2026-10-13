@@ -75,6 +75,15 @@ export function ThreadBar({
       </button>
       <button
         type="button"
+        onClick={handleDelete}
+        disabled={!activeId}
+        title="Delete thread"
+        className="rounded-md px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+      >
+        🗑
+      </button>
+      <button
+        type="button"
         onClick={onToggleSettings}
         title="Settings"
         aria-pressed={settingsView}
@@ -83,15 +92,6 @@ export function ThreadBar({
         }`}
       >
         ⚙
-      </button>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={!activeId}
-        title="Delete thread"
-        className="rounded-md px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
-      >
-        🗑
       </button>
     </div>
   );

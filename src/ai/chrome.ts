@@ -3,6 +3,7 @@ import type {
   AIProvider,
   Capabilities,
   CapabilityStatus,
+  DownloadRequest,
   PromptRequest,
   ProofreadRequest,
   RewriteRequest,
@@ -23,8 +24,40 @@ function has(name: string): boolean {
 
 function toStatus(value: unknown): CapabilityStatus {
   if (value === 'available') return 'available';
-  if (value === 'downloading' || value === 'downloadable') return 'downloading';
+  if (value === 'downloading') return 'downloading';
+  // "downloadable" means the model was never fetched and nothing is running:
+  // keep it apart from "downloading" so the banner doesn't claim progress.
+  if (value === 'downloadable') return 'downloadable';
   return 'unavailable';
+}
+
+// `downloadprogress` reports `loaded` as a 0–1 fraction in current Chrome;
+// older builds used byte counts (with `total`). Normalize both to 0–1.
+function toFraction(event: unknown): number | null {
+  const e = (typeof event === 'object' && event !== null ? event : {}) as {
+    loaded?: unknown;
+    total?: unknown;
+  };
+  const loaded = Number(e.loaded);
+  if (!Number.isFinite(loaded)) return null;
+  const total = Number(e.total);
+  if (Number.isFinite(total) && total > 0) return Math.min(1, Math.max(0, loaded / total));
+  if (loaded <= 1) return Math.min(1, Math.max(0, loaded));
+  return null;
+}
+
+function progressMonitor(
+  onProgress?: (progress: number) => void,
+): ((monitor: unknown) => void) | undefined {
+  if (!onProgress) return undefined;
+  return (monitor: unknown) => {
+    (
+      monitor as { addEventListener?: (name: string, fn: (event: unknown) => void) => void }
+    ).addEventListener?.('downloadprogress', (event) => {
+      const fraction = toFraction(event);
+      if (fraction !== null) onProgress(fraction);
+    });
+  };
 }
 
 async function collect(
@@ -62,6 +95,79 @@ export const chromeProvider: AIProvider = {
       rewrite: has('Rewriter') ? await probe('Rewriter') : 'unavailable',
       proofread: has('Proofreader') ? await probe('Proofreader') : 'unavailable',
     };
+  },
+
+  async download({ capability, targetLanguage, onProgress }: DownloadRequest): Promise<void> {
+    const monitor = progressMonitor(onProgress);
+    const withMonitor = monitor ? { monitor } : {};
+    // Creating a session is what makes Chrome fetch the (local) model; the
+    // session itself is useless to us, so destroy it right away.
+    switch (capability) {
+      case 'prompt': {
+        if (!has('LanguageModel')) {
+          throw new Error('Prompt API (LanguageModel) is not available in this browser.');
+        }
+        const session = await w.LanguageModel.create(withMonitor);
+        session.destroy?.();
+        return;
+      }
+      case 'translate': {
+        if (!has('Translator')) {
+          throw new Error('Translator API is not available in this browser.');
+        }
+        if (!targetLanguage) throw new Error('Translator downloads need a target language.');
+        const translator = await w.Translator.create({
+          targetLanguage,
+          ...withMonitor,
+        });
+        translator.destroy?.();
+        return;
+      }
+      case 'summarize': {
+        if (!has('Summarizer')) {
+          throw new Error('Summarizer API is not available in this browser.');
+        }
+        // Same defaults the composer starts from, per availability()/create() parity.
+        const summarizer = await w.Summarizer.create({
+          type: 'key-points',
+          format: 'markdown',
+          length: 'medium',
+          ...withMonitor,
+        });
+        summarizer.destroy?.();
+        return;
+      }
+      case 'write': {
+        if (!has('Writer')) {
+          throw new Error(
+            'Writer API is not available. Enable chrome://flags/#writer-api-for-gemini-nano.',
+          );
+        }
+        const writer = await w.Writer.create(withMonitor);
+        writer.destroy?.();
+        return;
+      }
+      case 'rewrite': {
+        if (!has('Rewriter')) {
+          throw new Error(
+            'Rewriter API is not available. Enable chrome://flags/#writer-api-for-gemini-nano.',
+          );
+        }
+        const rewriter = await w.Rewriter.create(withMonitor);
+        rewriter.destroy?.();
+        return;
+      }
+      case 'proofread': {
+        if (!has('Proofreader')) {
+          throw new Error(
+            'Proofreader API is not available. Enable chrome://flags/#proofreader-api.',
+          );
+        }
+        const proofreader = await w.Proofreader.create(withMonitor);
+        proofreader.destroy?.();
+        return;
+      }
+    }
   },
 
   async prompt({ prompt, history, context, signal, onStream }: PromptRequest): Promise<string> {
