@@ -23,6 +23,11 @@ interface ComposerProps {
   isRunning: boolean;
   /** Latest assistant result, or null. Enables "send with no text" for text modes. */
   lastResult: string | null;
+  /** Whether the current page can be read (content script present). */
+  pageContextAvailable: boolean;
+  /** Whether to include the current page as context. */
+  usePageContext: boolean;
+  onTogglePageContext: (enabled: boolean) => void;
 }
 
 export function Composer({
@@ -36,6 +41,9 @@ export function Composer({
   onStop,
   isRunning,
   lastResult,
+  pageContextAvailable,
+  usePageContext,
+  onTogglePageContext,
 }: ComposerProps) {
   const hasText = value.trim().length > 0;
   const canUseLast =
@@ -65,6 +73,13 @@ export function Composer({
       if (mode) onSelectMode(mode);
     },
     [onSelectMode],
+  );
+
+  const handlePageContextToggle = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      onTogglePageContext(e.currentTarget.checked);
+    },
+    [onTogglePageContext],
   );
 
   return (
@@ -104,7 +119,32 @@ export function Composer({
             {m.label}
           </button>
         ))}
+        {/* Page context toggle */}
+        <label className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={usePageContext}
+            onChange={handlePageContextToggle}
+            disabled={!pageContextAvailable}
+            className="accent-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={
+              pageContextAvailable
+                ? 'Include the current page as context'
+                : 'Cannot read this page (chrome://, PDF, or tab opened before extension loaded)'
+            }
+          />
+          <span className="whitespace-nowrap">
+            {pageContextAvailable ? '📄 Use this page' : '📄 Page unavailable'}
+          </span>
+        </label>
       </div>
+
+      {usePageContext && pageContextAvailable && (
+        <div className="mt-1 text-xs text-indigo-300">Using the current page as context.</div>
+      )}
+      {!pageContextAvailable && usePageContext && (
+        <div className="mt-1 text-xs text-amber-300">Cannot read this page — toggle ignored.</div>
+      )}
 
       <div className="mt-2">
         <ModeFields mode={selectedMode} options={options} onChange={onOptionsChange} />

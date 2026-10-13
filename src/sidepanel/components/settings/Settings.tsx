@@ -93,6 +93,39 @@ export function Settings({
         })}
       </div>
 
+      {/* Web search section */}
+      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-800/40 p-3">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          Web search
+        </h3>
+        <p className="mb-2 text-xs text-zinc-500">
+          When a prompt looks like it needs current information, suggest a web search. The query is
+          sent to your default search engine — it leaves your device.
+        </p>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="search-enabled"
+              checked={draft.search.enabled === 'off'}
+              onChange={() => setDraft((prev) => ({ ...prev, search: { enabled: 'off' } }))}
+              className="accent-indigo-500"
+            />
+            <span className="text-sm text-zinc-100">Off</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="search-enabled"
+              checked={draft.search.enabled === 'suggest'}
+              onChange={() => setDraft((prev) => ({ ...prev, search: { enabled: 'suggest' } }))}
+              className="accent-indigo-500"
+            />
+            <span className="text-sm text-zinc-100">Suggest (show a chip, click to search)</span>
+          </label>
+        </div>
+      </div>
+
       {noneEnabled && (
         <div className="mt-3 text-xs text-amber-300">
           Enable at least one action — otherwise the selection toolbar stays hidden.

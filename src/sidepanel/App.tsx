@@ -13,6 +13,7 @@ import { useThreads } from './hooks/useThreads';
 import { buildContext, TEXT_MODES, type SendContext } from './lib/context';
 import { MODE_LIST, type ModeOptions } from './lib/modeOptions';
 import { runMode } from './lib/runMode';
+import { routeSearch, heuristicSuggestsSearch } from './lib/router';
 import { newId, truncate } from './lib/threads';
 
 type View = 'chat' | 'home' | 'settings';
@@ -21,7 +22,7 @@ type View = 'chat' | 'home' | 'settings';
 const PENDING_KEYS = ['pendingSelection', 'pendingMode', 'pendingActionId'];
 
 /** Send context for page actions: a freshly created thread has no history yet. */
-const EMPTY_CONTEXT: SendContext = { history: [], lastResult: null };
+const EMPTY_CONTEXT: SendContext = { history: [], lastResult: null, pageText: null };
 
 function isAbortError(err: unknown): boolean {
   if (err instanceof Error && err.name === 'AbortError') return true;
@@ -67,6 +68,8 @@ export default function App() {
   const [view, setView] = useState<View | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const handledActionRef = useRef<string | null>(null);
+  const [usePageContext, setUsePageContext] = useState(false);
+  const [pageContextAvailable, setPageContextAvailable] = useState(false);
 
   const modeOptions = modeOptionsOverride ?? settings.options;
   const resolvedView: View = view ?? (settingsLoaded && !settingsConfigured ? 'settings' : 'chat');
@@ -106,6 +109,25 @@ export default function App() {
             appendChunk(threadId, assistantId, chunk);
           },
         });
+
+        // In Prompt mode, run the search router in parallel (if enabled in settings).
+        if (mode === 'prompt' && settings.search?.enabled === 'suggest') {
+          const shouldSearch = heuristicSuggestsSearch(content);
+          if (shouldSearch) {
+            // Fire and forget; the chip appears when it resolves.
+            routeSearch(content, sendContext.pageText, controller.signal).then((query) => {
+              if (query && !controller.signal.aborted) {
+                // Read the current assistant message and merge searchQuery.
+                const currentThread = threads.find((t) => t.id === threadId);
+                const currentMessage = currentThread?.messages.find((m) => m.id === assistantId);
+                if (currentMessage) {
+                  setMessage(threadId, assistantId, { ...currentMessage, searchQuery: query });
+                }
+              }
+            });
+          }
+        }
+
         setMessage(threadId, assistantId, { content: result });
       } catch (err) {
         if (isAbortError(err)) {
@@ -122,7 +144,7 @@ export default function App() {
         }
       }
     },
-    [appendChunk, provider, setMessage],
+    [appendChunk, provider, setMessage, settings.search, threads],
   );
 
   // A page selection action runs immediately in a fresh thread, using the
@@ -203,10 +225,37 @@ export default function App() {
     };
   }, [settingsLoaded, handleRunSelection]);
 
+  // Check if the current page can be read (content script is present).
+  // We use a ref to avoid sync setState in the effect body.
+  const pageContextCheckRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    pageContextCheckRef.current?.abort();
+    const controller = new AbortController();
+    pageContextCheckRef.current = controller;
+
+    const checkPage = async () => {
+      if (typeof chrome === 'undefined' || !chrome.tabs) return;
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs[0];
+      if (!tab?.id) return;
+      try {
+        await chrome.tabs.sendMessage(tab.id, { type: 'get-page-text' });
+        if (!controller.signal.aborted) setPageContextAvailable(true);
+      } catch {
+        if (!controller.signal.aborted) setPageContextAvailable(false);
+      }
+    };
+    checkPage();
+    return () => controller.abort();
+  }, [activeThread?.id]);
+
   // Context is derived from the thread as it stands right now: recent turns for
   // the model + the latest assistant result for "that"/empty-input resolution.
   // Memoized so handleSend (and children) don't get a new object every render.
-  const ctx = useMemo(() => buildContext(activeThread), [activeThread]);
+  const ctx = useMemo(
+    () => buildContext(activeThread, usePageContext ? null : null),
+    [activeThread, usePageContext],
+  );
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -216,6 +265,25 @@ export default function App() {
       if ((!content && !resolvable) || isRunning) return;
 
       const threadId = activeId ?? createThread();
+
+      // If page context is enabled, fetch the page text.
+      let pageText: string | null = null;
+      if (usePageContext && pageContextAvailable) {
+        if (typeof chrome !== 'undefined' && chrome.tabs) {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          const tab = tabs[0];
+          if (tab?.id) {
+            try {
+              const response = await chrome.tabs.sendMessage(tab.id, { type: 'get-page-text' });
+              if (response && typeof response.text === 'string') {
+                pageText = response.text;
+              }
+            } catch {
+              // Ignore errors, pageText remains null.
+            }
+          }
+        }
+      }
 
       appendMessage(threadId, {
         id: newId(),
@@ -234,9 +302,23 @@ export default function App() {
       });
       setDraft('');
 
-      await executeRun(threadId, assistantId, mode, content, modeOptions, ctx);
+      // Build context with page text if available.
+      const sendContext = { ...ctx, pageText };
+
+      await executeRun(threadId, assistantId, mode, content, modeOptions, sendContext);
     },
-    [activeId, appendMessage, createThread, ctx, executeRun, isRunning, modeOptions, selectedMode],
+    [
+      activeId,
+      appendMessage,
+      createThread,
+      ctx,
+      executeRun,
+      isRunning,
+      modeOptions,
+      selectedMode,
+      usePageContext,
+      pageContextAvailable,
+    ],
   );
 
   const handleSendDraft = useCallback(() => {
@@ -330,6 +412,9 @@ export default function App() {
             onStop={handleStop}
             isRunning={isRunning}
             lastResult={ctx.lastResult}
+            pageContextAvailable={pageContextAvailable}
+            usePageContext={usePageContext}
+            onTogglePageContext={setUsePageContext}
           />
         </>
       )}

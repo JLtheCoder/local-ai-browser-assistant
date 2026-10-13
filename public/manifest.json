@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "On-device AI in the side panel via Chrome Built-in AI (Gemini Nano).",
   "minimum_chrome_version": "138",
-  "permissions": ["sidePanel", "contextMenus", "storage"],
+  "permissions": ["sidePanel", "contextMenus", "storage", "search"],
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],

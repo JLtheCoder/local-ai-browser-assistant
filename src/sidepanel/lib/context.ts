@@ -1,4 +1,5 @@
 import type { ConversationTurn, ModeId } from '../../ai/types';
+import { TurnRole } from '../../ai/types';
 import type { Thread } from './threads';
 
 /** How many recent messages are fed back to the model as context each turn. */
@@ -6,6 +7,9 @@ export const HISTORY_WINDOW = 20;
 
 /** Character budget for the `sharedContext` string given to Writer/Summarizer. */
 const SHARED_CONTEXT_MAX_CHARS = 4000;
+
+/** Character budget for page context (larger since Prompt has more room). */
+export const PAGE_CONTEXT_MAX_CHARS = 12000;
 
 /** Modes that operate on a piece of text (and can therefore reference the last result). */
 export const TEXT_MODES: ModeId[] = ['translate', 'summarize', 'rewrite', 'proofread'];
@@ -38,6 +42,7 @@ const REFERENCE_PHRASES = new Set([
 export interface SendContext {
   history: ConversationTurn[];
   lastResult: string | null;
+  pageText: string | null;
 }
 
 function isReferenceText(text: string): boolean {
@@ -49,8 +54,8 @@ function isReferenceText(text: string): boolean {
 }
 
 /** Build per-send context from the thread: recent turns + the latest assistant result. */
-export function buildContext(thread: Thread | null): SendContext {
-  if (!thread) return { history: [], lastResult: null };
+export function buildContext(thread: Thread | null, pageText: string | null = null): SendContext {
+  if (!thread) return { history: [], lastResult: null, pageText };
 
   // Empty assistant messages are placeholders for an in-flight (or interrupted)
   // response; error replies are noise for the model. Neither is a usable result.
@@ -59,12 +64,12 @@ export function buildContext(thread: Thread | null): SendContext {
   );
 
   const history: ConversationTurn[] = usable.slice(-HISTORY_WINDOW).map((m) => ({
-    role: m.role,
+    role: m.role as TurnRole,
     content: m.content,
   }));
 
   const lastAssistant = [...usable].reverse().find((m) => m.role === 'assistant');
-  return { history, lastResult: lastAssistant?.content ?? null };
+  return { history, lastResult: lastAssistant?.content ?? null, pageText };
 }
 
 /** Resolve "that"/"it"/"" style references to the last assistant result (text modes only). */
@@ -75,9 +80,18 @@ export function resolveText(mode: ModeId, input: string, ctx: SendContext): stri
 }
 
 /** Flatten the recent conversation into a sharedContext string, newest-last. */
-export function historyToSharedContext(history: ConversationTurn[]): string | undefined {
-  if (history.length === 0) return undefined;
-  const lines = history.map((t) => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.content}`);
+export function historyToSharedContext(
+  history: ConversationTurn[],
+  pageText?: string,
+): string | undefined {
+  if (history.length === 0 && !pageText) return undefined;
+  const lines = history.map(
+    (t) =>
+      `${t.role === TurnRole.user ? 'User' : t.role === TurnRole.system ? 'System' : 'Assistant'}: ${t.content}`,
+  );
+  if (pageText) {
+    lines.unshift(`System (page context): ${pageText}`);
+  }
   let joined = lines.join('\n\n');
   while (joined.length > SHARED_CONTEXT_MAX_CHARS && lines.length > 1) {
     lines.shift();

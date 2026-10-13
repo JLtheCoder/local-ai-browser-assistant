@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { searchWeb } from '../../../search';
 import type { ChatMessage } from '../../lib/threads';
 
 function modeLabel(mode: string): string {
@@ -37,6 +38,18 @@ export function Message({ message }: { message: ChatMessage }) {
             }`}
           >
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+          </div>
+        )}
+        {message.searchQuery && (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => void searchWeb(message.searchQuery!)}
+              className="flex items-center gap-1 rounded-md bg-zinc-700 px-2 py-1 text-xs text-indigo-200 hover:bg-zinc-600 hover:text-indigo-100"
+              title="Search the web for this query"
+            >
+              🔍 Search the web for <em>«{message.searchQuery}»</em>
+            </button>
           </div>
         )}
       </div>

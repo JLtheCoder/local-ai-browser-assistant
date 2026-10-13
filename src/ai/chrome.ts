@@ -64,13 +64,22 @@ export const chromeProvider: AIProvider = {
     };
   },
 
-  async prompt({ prompt, history, signal, onStream }: PromptRequest): Promise<string> {
+  async prompt({ prompt, history, context, signal, onStream }: PromptRequest): Promise<string> {
     if (!has('LanguageModel')) {
       throw new Error('Prompt API (LanguageModel) is not available in this browser.');
     }
     // Seed the session with prior turns so Prompt mode has conversational memory.
+    // If context is provided, prepend it as a system turn.
+    const initialPrompts =
+      history && history.length > 0
+        ? context
+          ? [{ role: 'system' as const, content: context }, ...history]
+          : history
+        : context
+          ? [{ role: 'system' as const, content: context }]
+          : undefined;
     const session = await w.LanguageModel.create({
-      ...(history && history.length > 0 ? { initialPrompts: history } : {}),
+      ...(initialPrompts ? { initialPrompts } : {}),
       signal,
     });
     if (onStream && typeof session.promptStreaming === 'function') {

@@ -34,11 +34,14 @@ export interface AppSettings {
   actions: Record<SelectionActionId, boolean>;
   /** Default mode options used by page actions (and to seed the composer). */
   options: ModeOptions;
+  /** Web search suggestion setting. */
+  search: { enabled: 'off' | 'suggest' };
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   actions: { summarize: true, translate: true, proofread: true, rewrite: true },
   options: DEFAULT_OPTIONS,
+  search: { enabled: 'suggest' },
 };
 
 const MODE_IDS: ModeId[] = ['prompt', 'translate', 'summarize', 'write', 'rewrite', 'proofread'];
@@ -62,6 +65,10 @@ export function normalizeSettings(value: unknown): AppSettings {
     typeof raw.options === 'object' && raw.options !== null
       ? (raw.options as Record<string, unknown>)
       : {};
+  const rawSearch =
+    typeof raw.search === 'object' && raw.search !== null
+      ? (raw.search as Record<string, unknown>)
+      : {};
 
   const actions = { ...DEFAULT_SETTINGS.actions };
   for (const action of SELECTION_ACTIONS) {
@@ -75,5 +82,12 @@ export function normalizeSettings(value: unknown): AppSettings {
     if (typeof stored === 'string') options[key] = stored;
   }
 
-  return { actions, options };
+  const searchEnabled = rawSearch.enabled;
+  const search = {
+    enabled: (searchEnabled === 'off' || searchEnabled === 'suggest'
+      ? searchEnabled
+      : 'suggest') as 'off' | 'suggest',
+  };
+
+  return { actions, options, search };
 }

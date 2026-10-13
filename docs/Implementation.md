@@ -1,5 +1,33 @@
 # Implementation
 
+## 1.6 — Page context & web search suggestions
+
+Status: complete. The assistant can now read the current page and suggest web searches.
+
+- **Page context** (`src/sidepanel/lib/pageContext.ts` + `src/content.ts`): a `📄 Use this page`
+  toggle in the composer (works with any mode). When enabled, the assistant receives the
+  current page's text (via the existing content script — no new permissions). In Prompt
+  mode it's added as a leading `system` turn in `initialPrompts`; in Summarize/Write it's
+  folded into `sharedContext`. The toggle gracefully degrades on chrome://, PDFs, or tabs
+  opened before the extension loaded.
+- **Search router** (`src/sidepanel/lib/router.ts`): a second on-device `LanguageModel` call
+  runs _in parallel_ with the answer (zero added latency). Contract: reply with exactly
+  one line — `"NO"` if answerable from page/general knowledge, otherwise `"SEARCH: <query>"`.
+  Lenient regex parse, fallback to `NO` on any error. Heuristic gate (`latest`, `news`,
+  `price`, `version X`, `who is`, etc.) avoids the call when search is clearly unnecessary.
+- **Suggestion chip** (`src/sidepanel/components/conversation/Message.tsx`): when the
+  router returns a query, a `🔍 Search the web for «query»` chip appears under the
+  assistant bubble. Clicking it calls `chrome.search.query` (`disposition: NEW_TAB`),
+  opening the user's default search engine. The query is the only thing that leaves the
+  device — disclosed in settings.
+- **Settings** (`components/settings/Settings.tsx`): _Web search_ section with `Off` /
+  `Suggest` (default `Suggest`) radio buttons + "query leaves device" copy.
+- **Manifest**: added `"search"` permission. Still **no** `tabs` / `scripting` /
+  `host_permissions` — page text read via existing content script (`all_frames: true`).
+- **Types**: `TurnRole` constant (`user` | `assistant` | `system`) eliminates magic
+  strings; `ConversationTurn.role` and `ChatMessage.role` widened to include `system`;
+  `PromptRequest.context` for page text; optional `ChatMessage.searchQuery` for the chip.
+
 ## 1.5 — Page selection toolbar & settings
 
 Status: complete. Select text anywhere and act on it without opening the panel first.

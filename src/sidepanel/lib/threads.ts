@@ -1,12 +1,14 @@
-import type { ModeId } from '../../ai/types';
+import type { ModeId, TurnRole } from '../../ai/types';
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: TurnRole;
   content: string;
   mode: ModeId;
   createdAt: number;
   error?: boolean;
+  /** Optional web search query suggested by the router (for the chip). */
+  searchQuery?: string;
 }
 
 export interface Thread {

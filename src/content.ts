@@ -8,6 +8,18 @@ import {
   type SelectionActionSpec,
 } from './settings';
 
+interface GetPageTextMessage {
+  type: 'get-page-text';
+}
+
+function isGetPageTextMessage(value: unknown): value is GetPageTextMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as Record<string, unknown>).type === 'get-page-text'
+  );
+}
+
 declare global {
   interface Window {
     __localAiAssistantToolbar?: boolean;
@@ -196,6 +208,20 @@ function initSelectionToolbar() {
   function handleKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape') hideToolbar();
   }
+
+  // Handle messages from the side panel (e.g., get-page-text).
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (isGetPageTextMessage(message)) {
+      // Return page info asynchronously; sendResponse is called after the async function.
+      (async () => {
+        const maxChars = 50000;
+        const text = document.body.innerText.trim().slice(0, maxChars);
+        sendResponse({ url: location.href, title: document.title, text });
+      })();
+      return true; // Indicates async response.
+    }
+    return false;
+  });
 
   document.addEventListener('mouseup', handleMouseUp, true);
   document.addEventListener('selectionchange', handleSelectionChange);

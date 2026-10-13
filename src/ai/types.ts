@@ -16,8 +16,16 @@ export interface StreamOptions {
   onStream?: (chunk: string) => void;
 }
 
+export type TurnRole = 'user' | 'assistant' | 'system';
+
+export const TurnRole = {
+  user: 'user' as TurnRole,
+  assistant: 'assistant' as TurnRole,
+  system: 'system' as TurnRole,
+} as const;
+
 export interface ConversationTurn {
-  role: 'user' | 'assistant';
+  role: TurnRole;
   content: string;
 }
 
@@ -25,6 +33,8 @@ export interface PromptRequest extends StreamOptions {
   prompt: string;
   /** Prior conversation turns, fed to the model as context for multi-turn chats. */
   history?: ConversationTurn[];
+  /** Optional page-level context (e.g., current page text), inserted as a leading system turn. */
+  context?: string;
 }
 
 export interface TranslateRequest extends StreamOptions {

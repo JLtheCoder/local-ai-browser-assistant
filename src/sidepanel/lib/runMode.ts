@@ -18,12 +18,15 @@ export async function runMode(
   // Prompt and Write keep their input as-is; text modes resolve "that"/empty
   // references against the last result from the thread.
   const input = resolveText(mode, rawInput.trim(), ctx);
+  // For Summarize/Write, include page context in sharedContext.
+  const sharedContext = historyToSharedContext(ctx.history, ctx.pageText ?? undefined);
 
   switch (mode) {
     case 'prompt':
       return provider.prompt({
         prompt: input,
         history: ctx.history,
+        context: ctx.pageText ?? undefined,
         signal: stream.signal,
         onStream: stream.onStream,
       });
@@ -41,7 +44,7 @@ export async function runMode(
         type: options.summarizeType,
         length: options.summarizeLength,
         format: options.summarizeFormat,
-        sharedContext: historyToSharedContext(ctx.history),
+        sharedContext,
         signal: stream.signal,
         onStream: stream.onStream,
       });
@@ -51,7 +54,7 @@ export async function runMode(
         tone: options.writeTone,
         length: options.writeLength,
         format: options.writeFormat,
-        sharedContext: historyToSharedContext(ctx.history),
+        sharedContext,
         signal: stream.signal,
         onStream: stream.onStream,
       });
