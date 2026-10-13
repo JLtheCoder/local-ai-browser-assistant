@@ -11,6 +11,13 @@ import {
 import { ModeFields } from '../ModeFields';
 import { Button, TextArea } from '../ui';
 
+/** Modes that support page context (Prompt, Summarize, Write). */
+const PAGE_CONTEXT_MODES: ModeId[] = ['prompt', 'summarize', 'write'];
+
+function supportsPageContext(mode: ModeId): boolean {
+  return PAGE_CONTEXT_MODES.includes(mode);
+}
+
 interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
@@ -97,10 +104,32 @@ export function Composer({
       />
       {canUseLast ? (
         <div className="mt-1 text-xs text-zinc-500">
-          Send with no text to act on the last result, or type “that” / “it”.
+          Send with no text to act on the last result, or type "that" / "it".
         </div>
       ) : (
         contextHint && <div className="mt-1 text-xs text-zinc-500">{contextHint}</div>
+      )}
+
+      {/* Page context toggle — only for modes that support it */}
+      {supportsPageContext(selectedMode) && pageContextAvailable && (
+        <div className="mt-2">
+          <label className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={usePageContext}
+              onChange={handlePageContextToggle}
+              className="accent-indigo-500"
+              title="Include the current page as context"
+            />
+            <span className="whitespace-nowrap">📄 Use this page as context</span>
+          </label>
+          {usePageContext && (
+            <div className="mt-1 text-xs text-indigo-300">Using the current page as context.</div>
+          )}
+        </div>
+      )}
+      {supportsPageContext(selectedMode) && !pageContextAvailable && usePageContext && (
+        <div className="mt-2 text-xs text-amber-300">Cannot read this page — toggle ignored.</div>
       )}
 
       <div className="mt-2 flex flex-wrap gap-1">
@@ -119,32 +148,7 @@ export function Composer({
             {m.label}
           </button>
         ))}
-        {/* Page context toggle */}
-        <label className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={usePageContext}
-            onChange={handlePageContextToggle}
-            disabled={!pageContextAvailable}
-            className="accent-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={
-              pageContextAvailable
-                ? 'Include the current page as context'
-                : 'Cannot read this page (chrome://, PDF, or tab opened before extension loaded)'
-            }
-          />
-          <span className="whitespace-nowrap">
-            {pageContextAvailable ? '📄 Use this page' : '📄 Page unavailable'}
-          </span>
-        </label>
       </div>
-
-      {usePageContext && pageContextAvailable && (
-        <div className="mt-1 text-xs text-indigo-300">Using the current page as context.</div>
-      )}
-      {!pageContextAvailable && usePageContext && (
-        <div className="mt-1 text-xs text-amber-300">Cannot read this page — toggle ignored.</div>
-      )}
 
       <div className="mt-2">
         <ModeFields mode={selectedMode} options={options} onChange={onOptionsChange} />
