@@ -101,6 +101,23 @@ export default function App() {
       const controller = new AbortController();
       abortRef.current = controller;
       setIsRunning(true);
+
+      // Prompt mode: ask the on-device model whether this prompt needs a web
+      // search (if enabled in settings). Runs in parallel with the answer.
+      if (
+        mode === 'prompt' &&
+        settings.search?.enabled === 'suggest' &&
+        heuristicSuggestsSearch(content)
+      ) {
+        // Fire and forget; the chip appears when it resolves. Patch only
+        // `searchQuery` so the (possibly still streaming) content is untouched.
+        void routeSearch(content, sendContext.pageText, controller.signal).then((query) => {
+          if (query && !controller.signal.aborted) {
+            setMessage(threadId, assistantId, { searchQuery: query });
+          }
+        });
+      }
+
       let streamed = '';
       try {
         const result = await runMode(provider, mode, content, options, sendContext, {
@@ -110,24 +127,6 @@ export default function App() {
             appendChunk(threadId, assistantId, chunk);
           },
         });
-
-        // In Prompt mode, run the search router in parallel (if enabled in settings).
-        if (mode === 'prompt' && settings.search?.enabled === 'suggest') {
-          const shouldSearch = heuristicSuggestsSearch(content);
-          if (shouldSearch) {
-            // Fire and forget; the chip appears when it resolves.
-            routeSearch(content, sendContext.pageText, controller.signal).then((query) => {
-              if (query && !controller.signal.aborted) {
-                // Read the current assistant message and merge searchQuery.
-                const currentThread = threads.find((t) => t.id === threadId);
-                const currentMessage = currentThread?.messages.find((m) => m.id === assistantId);
-                if (currentMessage) {
-                  setMessage(threadId, assistantId, { ...currentMessage, searchQuery: query });
-                }
-              }
-            });
-          }
-        }
 
         setMessage(threadId, assistantId, { content: result });
       } catch (err) {
@@ -145,7 +144,7 @@ export default function App() {
         }
       }
     },
-    [appendChunk, provider, setMessage, settings.search, threads],
+    [appendChunk, provider, setMessage, settings.search],
   );
 
   // A page selection action runs immediately in a fresh thread, using the

@@ -40,9 +40,19 @@ export async function routeSearch(
       prompt: fullPrompt,
       signal,
     });
-    const line = response.trim().split('\n')[0];
-    const m = line.match(/^SEARCH:\s*(.+)$/i);
-    return m ? m[1].slice(0, 200) : null;
+    // Lenient parse: the model may wrap the line in markdown emphasis or
+    // backticks despite the "exactly one line" instruction.
+    const line =
+      response
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.length > 0) ?? '';
+    const m = line.replace(/^[`*_]+|[`*_]+$/g, '').match(/^SEARCH:\s*(.+)$/i);
+    if (!m) return null;
+    return m[1]
+      .trim()
+      .replace(/^["'`«»]+|["'`«»]+$/g, '')
+      .slice(0, 200);
   } catch {
     // On any error (including abort), fall back to NO.
     return null;
