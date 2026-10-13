@@ -36,6 +36,7 @@ Chat-style side panel with persistent threads and six modes: Prompt, Translate, 
 - `src/background.ts` — MV3 service worker (context menu → composer prefill; toolbar messages → pending payload + `sidePanel.open()`).
 - `vite.config.ts` / `vite.content.config.ts` — main build (side panel + background) / IIFE build for the content script (`emptyOutDir: false`).
 - `icons/` — generated placeholder PNGs in `public/icons/` (copied to `dist/icons/`).
+- `docs/` — `Implementation.md` (per-release changelog) and `Memory.md` (V2 memory-system design: offscreen extraction worker, `assistant_memory_v1`, pluggable embedding backends — **draft, not yet implemented**; don't treat its contents as current behavior).
 
 ## Architecture rules
 
