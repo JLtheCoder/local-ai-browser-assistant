@@ -13,6 +13,7 @@ Chat-style side panel with persistent threads and six modes: Prompt, Translate, 
 - `npm run lint` — ESLint (Prettier wired in via `eslint-config-prettier`).
 - `npm run format` / `npm run format:check` — Prettier write / verify.
 - `npm run icons` — regenerate placeholder icons via `scripts/generate-icons.mjs`.
+- `npm run package` — build + zip `dist/` into `releases/<name>-<version>.zip` for the Chrome Web Store upload.
 - Load: `chrome://extensions` → Developer mode → Load unpacked → `dist/` (not repo root).
 - Test AI: `chrome://on-device-internals` confirms the model; the side panel banner shows per-API availability.
 

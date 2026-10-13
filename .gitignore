@@ -1,6 +1,7 @@
 node_modules
 dist
 build
+releases
 *.tsbuildinfo
 node_modules/.tmp
 .DS_Store

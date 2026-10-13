@@ -10,10 +10,18 @@ Get **web search suggestion chips** when a prompt needs current information.
 
 ```bash
 npm install
-npm run build   # outputs dist/
+npm run build     # outputs dist/
+npm run package   # build + zip releases/<name>-<version>.zip for the Chrome Web Store
 ```
 
 Then: `chrome://extensions` → Developer mode → **Load unpacked** → select the `dist/` folder.
+
+## Publish to the Chrome Web Store
+
+1. `npm run package` → upload `releases/local-ai-browser-assistant-<version>.zip` in the
+   [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
+2. The store signs and distributes the CRX itself; never upload a self-signed `.crx`.
+3. For local CRX testing only: `chrome://extensions` → **Pack extension** → select `dist/`.
 
 ## Chrome setup
 
