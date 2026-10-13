@@ -10,8 +10,9 @@ import { Settings } from './components/settings/Settings';
 import { ThreadBar } from './components/ThreadBar';
 import { useSettings } from './hooks/useSettings';
 import { useThreads } from './hooks/useThreads';
-import { buildContext, TEXT_MODES, type SendContext } from './lib/context';
+import { buildContext, PAGE_CONTEXT_MAX_CHARS, TEXT_MODES, type SendContext } from './lib/context';
 import { MODE_LIST, type ModeOptions } from './lib/modeOptions';
+import { readCurrentPage } from './lib/pageContext';
 import { runMode } from './lib/runMode';
 import { routeSearch, heuristicSuggestsSearch } from './lib/router';
 import { newId, truncate } from './lib/threads';
@@ -174,9 +175,37 @@ export default function App() {
       setSelectedMode(mode);
       setModeOptionsOverride(null);
       setView('chat');
-      void executeRun(threadId, assistantId, mode, text, settings.options, EMPTY_CONTEXT);
+
+      // The composer's "Use this page as context" toggle applies to page actions
+      // too: fetch the page text before running when it is enabled.
+      void (async () => {
+        let pageText: string | null = null;
+        if (usePageContext && pageContextAvailable) {
+          const page = await readCurrentPage();
+          if (page) {
+            pageText = page.text.slice(0, PAGE_CONTEXT_MAX_CHARS);
+            // Debug logging (disabled):
+            // console.log('[page-context] toolbar action fetched page text:', {
+            //   url: page.url,
+            //   textLength: page.text.length,
+            //   usedLength: pageText.length,
+            // });
+          }
+        }
+        await executeRun(threadId, assistantId, mode, text, settings.options, {
+          ...EMPTY_CONTEXT,
+          pageText,
+        });
+      })();
     },
-    [appendMessage, createThread, executeRun, settings.options],
+    [
+      appendMessage,
+      createThread,
+      executeRun,
+      settings.options,
+      usePageContext,
+      pageContextAvailable,
+    ],
   );
 
   // Page actions and the context menu write pending* keys to chrome.storage.local.
@@ -234,28 +263,35 @@ export default function App() {
     pageContextCheckRef.current = controller;
 
     const checkPage = async () => {
-      if (typeof chrome === 'undefined' || !chrome.tabs) return;
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tab = tabs[0];
-      if (!tab?.id) return;
-      try {
-        await chrome.tabs.sendMessage(tab.id, { type: 'get-page-text' });
-        if (!controller.signal.aborted) setPageContextAvailable(true);
-      } catch {
-        if (!controller.signal.aborted) setPageContextAvailable(false);
-      }
+      const page = await readCurrentPage();
+      if (!controller.signal.aborted) setPageContextAvailable(page !== null);
     };
     checkPage();
     return () => controller.abort();
   }, [activeThread?.id]);
 
+  // Re-check page context when the active tab changes.
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.tabs?.onActivated) return;
+    const listener = () => {
+      // Small delay to let the tab load.
+      setTimeout(() => {
+        pageContextCheckRef.current?.abort();
+        const controller = new AbortController();
+        pageContextCheckRef.current = controller;
+        void readCurrentPage().then((page) => {
+          if (!controller.signal.aborted) setPageContextAvailable(page !== null);
+        });
+      });
+    };
+    chrome.tabs.onActivated.addListener(listener);
+    return () => chrome.tabs.onActivated.removeListener(listener);
+  }, []);
+
   // Context is derived from the thread as it stands right now: recent turns for
   // the model + the latest assistant result for "that"/empty-input resolution.
   // Memoized so handleSend (and children) don't get a new object every render.
-  const ctx = useMemo(
-    () => buildContext(activeThread, usePageContext ? null : null),
-    [activeThread, usePageContext],
-  );
+  const ctx = useMemo(() => buildContext(activeThread), [activeThread]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -269,20 +305,23 @@ export default function App() {
       // If page context is enabled, fetch the page text.
       let pageText: string | null = null;
       if (usePageContext && pageContextAvailable) {
-        if (typeof chrome !== 'undefined' && chrome.tabs) {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          const tab = tabs[0];
-          if (tab?.id) {
-            try {
-              const response = await chrome.tabs.sendMessage(tab.id, { type: 'get-page-text' });
-              if (response && typeof response.text === 'string') {
-                pageText = response.text;
-              }
-            } catch {
-              // Ignore errors, pageText remains null.
-            }
-          }
+        const page = await readCurrentPage();
+        if (page) {
+          // Cap the page text to the context budget (Prompt has a finite window).
+          pageText = page.text.slice(0, PAGE_CONTEXT_MAX_CHARS);
+          // Debug logging (disabled):
+          // console.log('[page-context] fetched from content script:', {
+          //   url: page.url,
+          //   title: page.title,
+          //   textLength: page.text.length,
+          //   usedLength: pageText.length,
+          //   preview: pageText.slice(0, 120),
+          // });
+        } else {
+          // console.warn('[page-context] failed to fetch page text');
         }
+      } else {
+        // console.log('[page-context] skipped:', { usePageContext, pageContextAvailable });
       }
 
       appendMessage(threadId, {

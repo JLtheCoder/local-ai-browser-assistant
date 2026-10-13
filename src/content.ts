@@ -6,6 +6,7 @@ import {
   normalizeSettings,
   type AppSettings,
   type SelectionActionSpec,
+  type SelectionActionId,
 } from './settings';
 
 interface GetPageTextMessage {
@@ -60,6 +61,37 @@ function initSelectionToolbar() {
     return SELECTION_ACTIONS.filter((action) => settings.actions[action.id]);
   }
 
+  /** Expanded action spec that includes the split Prompt actions. */
+  interface ExpandedActionSpec {
+    id: SelectionActionId | 'prompt-new' | 'prompt-existing';
+    label: string;
+    hint: string;
+  }
+
+  /** Expand actions for the toolbar: Prompt becomes two buttons (New/Existing). */
+  function expandedActions(): ExpandedActionSpec[] {
+    const result: ExpandedActionSpec[] = [];
+    for (const action of enabledActions()) {
+      if (action.id === 'prompt') {
+        result.push(
+          {
+            id: 'prompt-new',
+            label: 'New Prompt',
+            hint: 'Send as a new prompt in a fresh thread.',
+          },
+          {
+            id: 'prompt-existing',
+            label: 'Existing Prompt',
+            hint: 'Prefill the composer for review.',
+          },
+        );
+      } else {
+        result.push(action);
+      }
+    }
+    return result;
+  }
+
   function ensureToolbar(): void {
     if (host?.isConnected && bar) return;
 
@@ -107,7 +139,7 @@ function initSelectionToolbar() {
     document.documentElement.append(host);
   }
 
-  function renderButtons(actions: SelectionActionSpec[]): void {
+  function renderButtons(actions: ExpandedActionSpec[]): void {
     if (!bar) return;
     const buttons = actions.map((action) => {
       const button = document.createElement('button');
@@ -160,10 +192,10 @@ function initSelectionToolbar() {
     showToolbar(actions, selection.rect);
   }
 
-  function showToolbar(actions: SelectionActionSpec[], rect: DOMRect): void {
+  function showToolbar(_actions: SelectionActionSpec[], rect: DOMRect): void {
     ensureToolbar();
     if (!bar) return;
-    renderButtons(actions);
+    renderButtons(expandedActions());
     bar.style.display = 'flex';
     positionToolbar(rect);
   }
@@ -216,6 +248,13 @@ function initSelectionToolbar() {
       (async () => {
         const maxChars = 50000;
         const text = document.body.innerText.trim().slice(0, maxChars);
+        // Debug logging (disabled):
+        // console.log('[page-context] content script returning page text:', {
+        //   url: location.href,
+        //   title: document.title,
+        //   textLength: text.length,
+        //   preview: text.slice(0, 120),
+        // });
         sendResponse({ url: location.href, title: document.title, text });
       })();
       return true; // Indicates async response.

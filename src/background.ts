@@ -1,7 +1,8 @@
-import { isSelectionActionId } from './settings';
+import { isPromptActionId, type ExpandedActionId } from './settings';
 import { newId } from './sidepanel/lib/threads';
 
-const MENU_ID = 'send-selection-to-ai';
+const MENU_ID_NEW = 'send-selection-to-ai-new';
+const MENU_ID_EXISTING = 'send-selection-to-ai-existing';
 
 interface SelectionActionMessage {
   type: 'selection-action';
@@ -21,25 +22,32 @@ function isSelectionActionMessage(value: unknown): value is SelectionActionMessa
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: MENU_ID,
-    title: 'Send selection to Local AI Assistant',
+    id: MENU_ID_NEW,
+    title: 'Send selection to Local AI Assistant (New thread)',
+    contexts: ['selection'],
+  });
+  chrome.contextMenus.create({
+    id: MENU_ID_EXISTING,
+    title: 'Send selection to Local AI Assistant (Existing thread)',
     contexts: ['selection'],
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== MENU_ID) return;
-
   const selection = info.selectionText?.trim();
   if (!selection) return;
 
-  void chrome.storage.local
-    .set({ pendingSelection: selection, pendingMode: 'summarize' })
-    .then(() => {
-      if (tab?.id != null) {
-        void chrome.sidePanel.open({ tabId: tab.id });
-      }
-    });
+  const isNewThread = info.menuItemId === MENU_ID_NEW;
+
+  void chrome.storage.local.set({
+    pendingSelection: selection,
+    pendingMode: 'summarize',
+    ...(isNewThread ? { pendingActionId: newId() } : {}),
+  });
+
+  if (tab?.id != null) {
+    void chrome.sidePanel.open({ tabId: tab.id });
+  }
 });
 
 // Page selection toolbar clicks (content script): store the selection + mode and
@@ -52,11 +60,14 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   const text = message.text.trim();
   if (!text) return;
 
-  const mode = isSelectionActionId(message.mode) ? message.mode : 'summarize';
+  const mode = message.mode as ExpandedActionId;
+  const isPrompt = isPromptActionId(mode);
+  const isNewThread = !isPrompt || mode === 'prompt-new';
+
   void chrome.storage.local.set({
     pendingSelection: text,
-    pendingMode: mode,
-    pendingActionId: newId(),
+    pendingMode: isPrompt ? 'prompt' : mode,
+    ...(isNewThread ? { pendingActionId: newId() } : {}),
   });
 
   const tabId = sender.tab?.id;

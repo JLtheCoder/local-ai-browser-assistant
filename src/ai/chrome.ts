@@ -78,6 +78,13 @@ export const chromeProvider: AIProvider = {
         : context
           ? [{ role: 'system' as const, content: context }]
           : undefined;
+    // Debug logging (disabled):
+    // console.log('[page-context] LanguageModel.create initialPrompts:', {
+    //   total: initialPrompts?.length ?? 0,
+    //   roles: initialPrompts?.map((t) => t.role),
+    //   contextLength: context?.length ?? 0,
+    //   contextPreview: context?.slice(0, 200),
+    // });
     const session = await w.LanguageModel.create({
       ...(initialPrompts ? { initialPrompts } : {}),
       signal,

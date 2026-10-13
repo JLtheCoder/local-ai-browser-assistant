@@ -11,7 +11,13 @@ export async function readCurrentPage(): Promise<{
   if (!tab?.id) return null;
 
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, { type: 'get-page-text' });
+    // frameId: 0 targets the main frame only — otherwise iframes (ads, sign-in
+    // buttons, embeds) reply first with their tiny text.
+    const response = await chrome.tabs.sendMessage(
+      tab.id,
+      { type: 'get-page-text' },
+      { frameId: 0 },
+    );
     if (response && typeof response.text === 'string') {
       return { url: response.url, title: response.title, text: response.text };
     }

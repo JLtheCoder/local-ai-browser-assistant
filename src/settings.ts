@@ -5,7 +5,10 @@ import { DEFAULT_OPTIONS, type ModeOptions } from './sidepanel/lib/modeOptions';
 export const SETTINGS_KEY = 'assistant_settings_v1';
 
 /** Modes offered by the page selection toolbar (a subset of the chat modes). */
-export type SelectionActionId = 'summarize' | 'translate' | 'proofread' | 'rewrite';
+export type SelectionActionId = 'summarize' | 'translate' | 'proofread' | 'rewrite' | 'prompt';
+
+/** Expanded action IDs that include the split Prompt actions. */
+export type ExpandedActionId = SelectionActionId | 'prompt-new' | 'prompt-existing';
 
 export interface SelectionActionSpec {
   id: SelectionActionId;
@@ -13,7 +16,7 @@ export interface SelectionActionSpec {
   hint: string;
 }
 
-/** Toolbar order: Summarize, Translate, Proofread, Rewrite. */
+/** Toolbar order: Summarize, Translate, Proofread, Rewrite, Prompt. */
 export const SELECTION_ACTIONS: SelectionActionSpec[] = [
   { id: 'summarize', label: 'Summarize', hint: 'Condense the selection to key points.' },
   {
@@ -27,6 +30,11 @@ export const SELECTION_ACTIONS: SelectionActionSpec[] = [
     label: 'Rewrite',
     hint: 'Rewrite the selection with a different tone or length.',
   },
+  {
+    id: 'prompt',
+    label: 'Prompt',
+    hint: 'Send the selection as a prompt (chat).',
+  },
 ];
 
 export interface AppSettings {
@@ -39,7 +47,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  actions: { summarize: true, translate: true, proofread: true, rewrite: true },
+  actions: { summarize: true, translate: true, proofread: true, rewrite: true, prompt: true },
   options: DEFAULT_OPTIONS,
   search: { enabled: 'suggest' },
 };
@@ -52,6 +60,10 @@ export function isModeId(value: unknown): value is ModeId {
 
 export function isSelectionActionId(value: unknown): value is SelectionActionId {
   return typeof value === 'string' && SELECTION_ACTIONS.some((a) => a.id === value);
+}
+
+export function isPromptActionId(value: unknown): value is 'prompt-new' | 'prompt-existing' {
+  return value === 'prompt-new' || value === 'prompt-existing';
 }
 
 /** Merge stored (untrusted) settings with the defaults; unknown keys are dropped. */

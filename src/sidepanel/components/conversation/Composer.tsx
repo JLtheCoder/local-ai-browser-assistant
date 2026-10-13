@@ -134,9 +134,6 @@ export function Composer({
             />
             <span className="whitespace-nowrap">📄 Use this page as context</span>
           </label>
-          {usePageContext && pageContextAvailable && (
-            <div className="mt-1 text-xs text-indigo-300">Using the current page as context.</div>
-          )}
           {usePageContext && !pageContextAvailable && (
             <div className="mt-1 text-xs text-amber-300">
               Cannot read this page — context unavailable.
