@@ -119,6 +119,11 @@ export function Composer({
                 ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer'
                 : 'text-zinc-600 cursor-not-allowed'
             }`}
+            title={
+              pageContextAvailable
+                ? 'Include the current page as context'
+                : 'Cannot read this page (chrome://, PDF, or tab opened before extension loaded)'
+            }
           >
             <input
               type="checkbox"
@@ -126,11 +131,6 @@ export function Composer({
               onChange={handlePageContextToggle}
               disabled={!pageContextAvailable}
               className="accent-indigo-500 disabled:opacity-40"
-              title={
-                pageContextAvailable
-                  ? 'Include the current page as context'
-                  : 'Cannot read this page (chrome://, PDF, or tab opened before extension loaded)'
-              }
             />
             <span className="whitespace-nowrap">📄 Use this page as context</span>
           </label>
