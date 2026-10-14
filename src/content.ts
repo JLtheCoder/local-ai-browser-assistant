@@ -3,6 +3,7 @@ import {
   SELECTION_ACTIONS,
   SETTINGS_KEY,
   isSelectionActionId,
+  isPromptActionId,
   normalizeSettings,
   type AppSettings,
   type SelectionActionSpec,
@@ -157,7 +158,7 @@ function initSelectionToolbar() {
     event.preventDefault();
     event.stopPropagation();
     const mode = (event.currentTarget as HTMLButtonElement).dataset.mode;
-    if (!isSelectionActionId(mode)) return;
+    if (!isSelectionActionId(mode) && !isPromptActionId(mode)) return;
 
     const live = window.getSelection()?.toString().trim();
     const text = live || selectedText;
