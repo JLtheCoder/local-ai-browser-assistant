@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.2.1",
   "type": "module",
+  "license": "MIT",
+  "author": "JLtheCoder",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && vite build --config vite.content.config.ts",
