@@ -1,5 +1,8 @@
 # Local AI Browser Assistant
 
+[![CI](https://github.com/JLtheCoder/local-ai-browser-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/JLtheCoder/local-ai-browser-assistant/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/JLtheCoder/local-ai-browser-assistant)](https://github.com/JLtheCoder/local-ai-browser-assistant/releases)
+
 On-device AI in the Chrome side panel, powered by Chrome Built-in AI (Gemini Nano).
 A chat-style UI with persistent threads and six modes: Prompt, Translate, Summarize, Write, Rewrite, Proofread.
 Select text on any page to get quick actions (Summarize / Translate / Proofread / Rewrite) right where you are.
@@ -18,10 +21,29 @@ Then: `chrome://extensions` → Developer mode → **Load unpacked** → select 
 
 ## Publish to the Chrome Web Store
 
-1. `npm run package` → upload `releases/local-ai-browser-assistant-<version>.zip` in the
+1. Download `local-ai-browser-assistant-<version>.zip` from the
+   [latest release](https://github.com/JLtheCoder/local-ai-browser-assistant/releases/latest)
+   (or run `npm run package` locally) and upload it in the
    [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 2. The store signs and distributes the CRX itself; never upload a self-signed `.crx`.
 3. For local CRX testing only: `chrome://extensions` → **Pack extension** → select `dist/`.
+
+## Releases
+
+Releases are automated from `main`. To publish a new version:
+
+1. Bump the version in **both** `package.json` and `public/manifest.json` to the same value.
+   `npm version <version> --no-git-tag-version` updates `package.json` and the lockfile;
+   edit `public/manifest.json` to match.
+2. Commit and push to `main`.
+
+CI must pass first. The release job then builds and packages the extension, creates the
+`v<version>` tag and a GitHub Release at that commit, and attaches the Web Store zip.
+If a release for that version already exists, the job does nothing — so ordinary commits
+don't create releases. Don't create the tag yourself; the workflow owns `v*` tags.
+
+The [latest release badge](https://github.com/JLtheCoder/local-ai-browser-assistant/releases)
+and the release's auto-generated notes (commits since the previous tag) update automatically.
 
 ## Chrome setup
 

@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR runs, but let main runs (which may publish a release) finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Lint, format & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: GitHub release
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read and validate version
+        id: version
+        run: |
+          pkg_version="$(node -p "require('./package.json').version")"
+          manifest_version="$(node -p "require('./public/manifest.json').version")"
+
+          if [ "$pkg_version" != "$manifest_version" ]; then
+            echo "::error::Version mismatch: package.json is $pkg_version but public/manifest.json is $manifest_version. Bump both to the same version."
+            exit 1
+          fi
+
+          echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$pkg_version" >> "$GITHUB_OUTPUT"
+
+      - name: Check for existing release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.version.outputs.tag }} already exists; nothing to publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download built extension
+        if: steps.existing.outputs.exists == 'false'
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-dist
+          path: dist
+
+      - name: Package for the Chrome Web Store
+        if: steps.existing.outputs.exists == 'false'
+        run: node scripts/package.mjs
+
+      - name: Create GitHub release
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" releases/*.zip \
+            --target "$GITHUB_SHA" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --generate-notes
