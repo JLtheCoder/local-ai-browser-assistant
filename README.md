@@ -2,12 +2,17 @@
 
 [![CI](https://github.com/JLtheCoder/local-ai-browser-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/JLtheCoder/local-ai-browser-assistant/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/JLtheCoder/local-ai-browser-assistant)](https://github.com/JLtheCoder/local-ai-browser-assistant/releases)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/iilbpcihblhlhmhhjfhhfdclhndjmaaa?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/local-ai-browser-assistan/iilbpcihblhlhmhhjfhhfdclhndjmaaa)
 
 On-device AI in the Chrome side panel, powered by Chrome Built-in AI (Gemini Nano).
 A chat-style UI with persistent threads and six modes: Prompt, Translate, Summarize, Write, Rewrite, Proofread.
 Select text on any page to get quick actions (Summarize / Translate / Proofread / Rewrite) right where you are.
 Toggle **📄 Use this page** to give the assistant the current page as context.
 Get **web search suggestion chips** when a prompt needs current information.
+
+## Install
+
+[**Local AI Browser Assistant** on the Chrome Web Store](https://chromewebstore.google.com/detail/local-ai-browser-assistan/iilbpcihblhlhmhhjfhhfdclhndjmaaa)
 
 ## Develop
 
